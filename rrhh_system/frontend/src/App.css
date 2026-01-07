@@ -1,0 +1,186 @@
+/* New Split Screen Layout for Auth Pages */
+.auth-page-container {
+  display: flex;
+  min-height: 100vh; /* Take full viewport height */
+  width: 100vw;    /* Take full viewport width */
+  overflow: hidden; /* Hide overflow from image */
+  background-color: var(--color-background-light); /* Consistent background */
+}
+
+.auth-image-side {
+  flex: 1; /* Takes half the space */
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  color: var(--color-text-light); /* Light text on image */
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5); /* For readability */
+  position: relative; /* For overlay */
+  overflow: hidden;
+}
+
+.auth-image-side::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.3); /* Semi-transparent overlay */
+  z-index: 1;
+}
+
+.auth-image-side .content {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  padding: 20px;
+}
+
+.auth-image-side h1 {
+  font-size: 3em;
+  margin-bottom: 10px;
+  color: var(--color-text-light); /* Override App.css h1 color */
+}
+
+.auth-image-side p {
+  font-size: 1.2em;
+  color: var(--color-text-light);
+}
+
+.auth-form-side {
+  flex: 1; /* Takes the other half */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .auth-page-container {
+    flex-direction: column; /* Stack vertically on smaller screens */
+  }
+  .auth-image-side {
+    min-height: 200px; /* Give image some height on mobile */
+    flex: none; /* Don't take full width */
+    width: 100%;
+  }
+  .auth-form-side {
+    flex: none; /* Don't take full width */
+    width: 100%;
+    padding: 20px 10px; /* Adjust padding for mobile */
+  }
+  .auth-image-side h1 {
+    font-size: 2em;
+  }
+  .auth-image-side p {
+    font-size: 1em;
+  }
+}
+
+/* Update .login-container to fit within the new layout */
+.login-container {
+  width: 100%; /* Take full width of its parent (.auth-form-side) */
+  max-width: 450px; /* Max width for the form itself */
+  margin: 0; /* Remove auto margin */
+  padding: 30px;
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  text-align: center;
+  box-sizing: border-box;
+}
+
+/* General App styles adjustment to use CSS variables */
+body {
+  /* Existing body styles will be overridden by index.css,
+     but ensure no conflicting properties that might break the new layout */
+  background-color: var(--color-background-light); /* Consistent with index.css */
+  color: var(--color-text-dark); /* Consistent with index.css */
+  padding: 0; /* Remove body padding here, layout will handle it */
+}
+
+.App {
+  max-width: none; /* Remove max-width, as auth-page-container will manage it */
+  margin: 0; /* Remove margin */
+  padding: 0; /* Remove padding */
+  background-color: transparent; /* App wrapper should be transparent to show layout */
+  box-shadow: none; /* Remove box-shadow from App wrapper */
+  min-height: 100vh; /* Ensure App takes full height */
+  display: flex; /* App component should fill its parent */
+  flex-direction: column; /* If App contains AppHeader and Routes */
+  width: 100%;
+}
+
+.app-header-with-logout {
+  background-color: var(--color-primary); /* Use corporate primary color */
+  color: var(--color-text-light); /* Light text on primary background */
+  padding: 15px 20px;
+  border-bottom: none; /* Remove border-bottom */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.app-header-with-logout h1 {
+  color: var(--color-text-light); /* Ensure heading is light in header */
+}
+
+.logout-button {
+  background-color: var(--color-danger); /* Use corporate danger color */
+}
+
+.logout-button:hover {
+  background-color: #bd2130;
+}
+
+/* General form elements within .login-container and other forms */
+form input[type="text"],
+form input[type="email"],
+form input[type="date"],
+form input[type="password"], /* Added password */
+form select { /* Added select for roles */
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 10px;
+  font-size: 1em;
+  color: var(--color-text-dark);
+  background-color: #fff;
+}
+
+form input:focus, form select:focus {
+  border-color: var(--color-secondary);
+  outline: none;
+  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25); /* Blue shadow on focus */
+}
+
+.login-container button[type="submit"] {
+  background-color: var(--color-primary);
+  color: var(--color-text-light);
+}
+
+.login-container button[type="submit"]:hover {
+  background-color: #218838;
+}
+
+.error-message, .success-message {
+  padding: 10px;
+  border-radius: 4px;
+  margin-bottom: 15px;
+}
+
+.error-message {
+  color: var(--color-danger);
+  background-color: #f8d7da; /* Light red background */
+  border: 1px solid #f5c6cb;
+}
+
+.success-message {
+  color: var(--color-success);
+  background-color: #d4edda; /* Light green background */
+  border: 1px solid #c3e6cb;
+}
+
