@@ -47,6 +47,7 @@ class Empleado(models.Model):
     nacionalidad = models.CharField(max_length=50)
     nombre_conyuge = models.CharField(max_length=200, blank=True, null=True)
     tiene_hijos = models.BooleanField(default=False)
+    foto = models.ImageField(upload_to=employee_directory_path, blank=True, null=True)
 
     # HR Information
     fecha_ingreso_inicial = models.DateField()

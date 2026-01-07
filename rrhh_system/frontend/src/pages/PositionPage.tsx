@@ -1,0 +1,147 @@
+// src/pages/PositionPage.tsx
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import { useAuth } from '../AuthContext';
+import { Modal } from '../components/Modal';
+
+interface Position {
+  id: number;
+  nombre: string;
+}
+
+export const PositionPage: React.FC = () => {
+  const { token } = useAuth();
+  const [positions, setPositions] = useState<Position[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingPosition, setEditingPosition] = useState<Position | null>(null);
+  const [positionName, setPositionName] = useState('');
+
+  const fetchPositions = async () => {
+    try {
+      setLoading(true);
+      const response = await axios.get('http://127.0.0.1:8000/api/cargos/', {
+        headers: { 'Authorization': `Token ${token}` }
+      });
+      if (response.data && Array.isArray(response.data)) {
+        setPositions(response.data);
+      } else {
+        setPositions([]);
+      }
+    } catch (err) {
+      setError('No se pudo cargar la lista de cargos.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchPositions(); }, [token]);
+
+  const openModal = (pos: Position | null) => {
+    setEditingPosition(pos);
+    setPositionName(pos ? pos.nombre : '');
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setEditingPosition(null);
+    setPositionName('');
+    setError(null);
+  };
+
+  const handleSubmit = async () => {
+    const url = editingPosition 
+      ? `http://127.0.0.1:8000/api/cargos/${editingPosition.id}/`
+      : 'http://127.0.0.1:8000/api/cargos/';
+    
+    const method = editingPosition ? 'put' : 'post';
+
+    try {
+      await axios({
+        method: method,
+        url: url,
+        data: { nombre: positionName },
+        headers: { 'Authorization': `Token ${token}` }
+      });
+      closeModal();
+      fetchPositions(); // Refresh list
+    } catch (err: any) {
+      setError(`Error al guardar el cargo: ${err.response?.data?.nombre || 'Error desconocido'}`);
+    }
+  };
+
+  const handleDelete = async (id: number) => {
+    if (window.confirm('¿Estás seguro de que quieres eliminar este cargo?')) {
+      try {
+        await axios.delete(`http://127.0.0.1:8000/api/cargos/${id}/`, {
+          headers: { 'Authorization': `Token ${token}` }
+        });
+        fetchPositions(); // Refresh list
+      } catch (err) {
+        setError('No se pudo eliminar el cargo.');
+      }
+    }
+  };
+
+  if (loading) return <div>Cargando cargos...</div>;
+
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold text-gray-800">Gestión de Cargos</h1>
+        <button onClick={() => openModal(null)} className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 font-semibold shadow-md">
+          Crear Nuevo Cargo
+        </button>
+      </div>
+      <div className="bg-white p-6 rounded-lg shadow-md">
+        <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                    <tr>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre del Cargo</th>
+                        <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                    {positions.map((pos) => (
+                        <tr key={pos.id}>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{pos.nombre}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-right">
+                                <button onClick={() => openModal(pos)} className="text-indigo-600 hover:text-indigo-900 mr-4">Editar</button>
+                                <button onClick={() => handleDelete(pos.id)} className="text-red-600 hover:text-red-900">Eliminar</button>
+                            </td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+      </div>
+
+      <Modal isOpen={isModalOpen} onClose={closeModal}>
+        <div>
+            <h2 className="text-2xl font-bold mb-6">{editingPosition ? 'Editar Cargo' : 'Crear Nuevo Cargo'}</h2>
+            {error && <div className="text-red-500 bg-red-100 p-3 rounded-lg mb-4">{error}</div>}
+            <div className="space-y-4">
+                <div>
+                    <label className="block text-sm font-medium text-gray-700">Nombre del Cargo</label>
+                    <input 
+                      type="text" 
+                      value={positionName} 
+                      onChange={(e) => setPositionName(e.target.value)} 
+                      className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2.5" 
+                    />
+                </div>
+            </div>
+            <div className="flex justify-end mt-8">
+                <button onClick={closeModal} className="mr-3 px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 font-semibold">Cancelar</button>
+                <button onClick={handleSubmit} className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 font-semibold">Guardar</button>
+            </div>
+        </div>
+      </Modal>
+    </div>
+  );
+};

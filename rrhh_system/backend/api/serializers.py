@@ -5,19 +5,37 @@ from .models import (
     Empleado, Departamento, Cargo, Familiar, Estudio, Contrato
 )
 
+class GroupSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Group
+        fields = ('name',)
+
 class UserSerializer(serializers.ModelSerializer):
+    """
+    Serializer for displaying user details.
+    """
+    groups = GroupSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = User
+        fields = ('id', 'username', 'email', 'groups', 'is_superuser')
+
+class UserCreateSerializer(serializers.ModelSerializer):
     """
     Serializer for user creation.
     """
-    role = serializers.ChoiceField(choices=['Admin', 'RRHH', 'Encargado', 'Empleado'], write_only=True)
+    email = serializers.EmailField(required=True)
+    # The role is now optional and defaults to 'Empleado' if not provided.
+    role = serializers.ChoiceField(choices=['Admin', 'RRHH', 'Encargado', 'Empleado'], write_only=True, required=False)
     password = serializers.CharField(write_only=True)
 
     class Meta:
         model = User
-        fields = ('username', 'password', 'role')
+        fields = ('username', 'email', 'password', 'role')
 
     def create(self, validated_data):
-        role_name = validated_data.pop('role')
+        # Default to 'Empleado' if 'role' is not in the validated data
+        role_name = validated_data.pop('role', 'Empleado')
         user = User.objects.create_user(**validated_data)
         
         try:
@@ -87,7 +105,7 @@ class EmpleadoSerializer(serializers.ModelSerializer):
             'nombre_conyuge', 'tiene_hijos', 'fecha_ingreso_inicial',
             'cargo', 'cargo_nombre',
             'departamento', 'departamento_nombre',
-            'jefe', 'jefe_info',
+            'jefe', 'jefe_info', 'foto',
             'fotocopia_ci', 'curriculum_vitae', 'certificado_antecedentes',
             'fotocopia_luz_agua_gas', 'croquis_domicilio', 'fotocopia_licencia_conducir',
             'familiares', 'estudios', 'contratos'

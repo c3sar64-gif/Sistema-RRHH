@@ -6,23 +6,12 @@ class Command(BaseCommand):
     help = 'Creates a list of predefined departments in the database'
 
     DEPARTMENTS = [
-        "Adm. Calidad",
-        "Adm. Comercial",
-        "Adm. Sistemas",
-        "Adm.y Contabilidad",
-        "Almacen",
-        'ALMACEN "LA GRANJA"',
-        "Almacen de Materiales Y Maples",
-        "Granja Tiquipaya 4",
-        "Integracion",
-        "Limpieza y Mtto. Tiquipaya",
-        "Logistica Ayudantes Choferes",
-        "Logistica Carguio y Descarguio",
-        "Logistica Tiquipaya",
-        "Molino",
-        "RRHH",
-        "Selección",
-        "Logistica Choferes",
+        "Adm. Calidad", "Adm. Comercial", "Adm. Sistemas", "Adm.y Contabilidad",
+        "Almacen", 'ALMACEN "LA GRANJA"', "Almacen de Materiales Y Maples",
+        "Granja Tiquipaya 4", "Integracion", "Limpieza y Mtto. Tiquipaya",
+        "Logistica Ayudantes Choferes", "Logistica Carguio y Descarguio",
+        "Logistica Tiquipaya", "Molino", "RRHH", "Seleccion",
+        "Logistica Choferes", "Gerencia", "Incubacion", "Desarrollo"
     ]
 
     @transaction.atomic

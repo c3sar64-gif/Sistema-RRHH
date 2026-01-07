@@ -83,7 +83,7 @@ DATABASES = {
         'NAME': 'SistemaRRHH',
         'USER': 'postgres',
         'PASSWORD': 'admin123',
-        'HOST': 'localhost',
+        'HOST': '127.0.0.1', # Using IP address instead of 'localhost' can sometimes resolve connection issues
         'PORT': '5432',
     }
 }
