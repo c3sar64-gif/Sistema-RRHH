@@ -50,22 +50,19 @@ export const LoginPage: React.FC = () => {
 
   return (
     <div className="flex h-screen bg-gray-100 font-sans">
-      <div 
-        className="hidden md:flex w-1/2 bg-cover bg-center relative"
-        style={{ backgroundImage: "url('/images/Background.png')" }}
-      >
-        <div className="absolute inset-0 bg-black opacity-60"></div>
-        <div className="relative z-10 flex flex-col justify-center items-center text-white text-center p-12">
-          <h1 className="text-5xl font-bold mb-4 tracking-tight">Sistema de Recursos Humanos</h1>
-          <p className="text-xl font-light">Avicola Rolon</p>
+      <div className="hidden md:flex w-1/2 bg-indigo-700 flex-col justify-center items-center p-12">
+        <div className="text-white text-center">
+            <h1 className="text-5xl font-bold mb-4 tracking-tight">Sistema de Recursos Humanos</h1>
+            <p className="text-xl font-light">Avicola Rolon</p>
         </div>
+        <img src="/images/Background.png" alt="Background" className="w-full h-auto opacity-100" />
       </div>
 
-      <div className="w-full md:w-1/2 flex flex-col justify-center items-center p-6 sm:p-12">
+      <div className="w-full md:w-1/2 flex flex-col justify-center items-center p-6 sm:p-12 bg-white">
         <div className="w-full max-w-md">
           <img src="/images/Logo Avicola Rolon.png" alt="Logo Avicola Rolon" className="w-40 h-auto mx-auto mb-6" />
 
-          <div className="bg-white p-8 rounded-xl shadow-lg">
+          <div>
             <h2 className="text-2xl font-bold text-gray-800 mb-2 text-center">Bienvenido de Nuevo</h2>
             <p className="text-gray-600 mb-6 text-center">Por favor, ingresa tus datos para iniciar sesión.</p>
 

@@ -53,7 +53,7 @@ class UserCreateSerializer(serializers.ModelSerializer):
 class FamiliarSerializer(serializers.ModelSerializer):
     class Meta:
         model = Familiar
-        fields = ['id', 'nombre_completo', 'parentesco', 'celular', 'activo']
+        fields = ['id', 'nombre_completo', 'parentesco', 'celular', 'fecha_nacimiento', 'activo']
 
 class EstudioSerializer(serializers.ModelSerializer):
     class Meta:
@@ -120,11 +120,42 @@ class EmpleadoSerializer(serializers.ModelSerializer):
 
     @transaction.atomic
     def create(self, validated_data):
+        # Pop nested data
         familiares_data = validated_data.pop('familiares', [])
         estudios_data = validated_data.pop('estudios', [])
         contratos_data = validated_data.pop('contratos', [])
 
+        # Pop file fields to handle separately after Empleado instance gets an ID
+        foto_file = validated_data.pop('foto', None)
+        fotocopia_ci_file = validated_data.pop('fotocopia_ci', None)
+        curriculum_vitae_file = validated_data.pop('curriculum_vitae', None)
+        certificado_antecedentes_file = validated_data.pop('certificado_antecedentes', None)
+        fotocopia_luz_agua_gas_file = validated_data.pop('fotocopia_luz_agua_gas', None)
+        croquis_domicilio_file = validated_data.pop('croquis_domicilio', None)
+        fotocopia_licencia_conducir_file = validated_data.pop('fotocopia_licencia_conducir', None)
+
+        # Create Empleado instance first to ensure it has an ID
         empleado = Empleado.objects.create(**validated_data)
+
+        # Assign and save file fields now that Empleado has an ID
+        if foto_file:
+            empleado.foto = foto_file
+        if fotocopia_ci_file:
+            empleado.fotocopia_ci = fotocopia_ci_file
+        if curriculum_vitae_file:
+            empleado.curriculum_vitae = curriculum_vitae_file
+        if certificado_antecedentes_file:
+            empleado.certificado_antecedentes = certificado_antecedentes_file
+        if fotocopia_luz_agua_gas_file:
+            empleado.fotocopia_luz_agua_gas = fotocopia_luz_agua_gas_file
+        if croquis_domicilio_file:
+            empleado.croquis_domicilio = croquis_domicilio_file
+        if fotocopia_licencia_conducir_file:
+            empleado.fotocopia_licencia_conducir = fotocopia_licencia_conducir_file
+        
+        # Save again if any file fields were assigned
+        if any([foto_file, fotocopia_ci_file, curriculum_vitae_file, certificado_antecedentes_file, fotocopia_luz_agua_gas_file, croquis_domicilio_file, fotocopia_licencia_conducir_file]):
+            empleado.save()
 
         for familiar_data in familiares_data:
             Familiar.objects.create(empleado=empleado, **familiar_data)
@@ -144,8 +175,37 @@ class EmpleadoSerializer(serializers.ModelSerializer):
         estudios_data = validated_data.pop('estudios', None)
         contratos_data = validated_data.pop('contratos', None)
 
+        # Pop file fields to handle separately after primary instance update
+        foto_file = validated_data.pop('foto', None)
+        fotocopia_ci_file = validated_data.pop('fotocopia_ci', None)
+        curriculum_vitae_file = validated_data.pop('curriculum_vitae', None)
+        certificado_antecedentes_file = validated_data.pop('certificado_antecedentes', None)
+        fotocopia_luz_agua_gas_file = validated_data.pop('fotocopia_luz_agua_gas', None)
+        croquis_domicilio_file = validated_data.pop('croquis_domicilio', None)
+        fotocopia_licencia_conducir_file = validated_data.pop('fotocopia_licencia_conducir', None)
+
         # Update the Empleado instance
         instance = super().update(instance, validated_data)
+
+        # Assign and save file fields if they were provided in the update
+        if foto_file:
+            instance.foto = foto_file
+        if fotocopia_ci_file:
+            instance.fotocopia_ci = fotocopia_ci_file
+        if curriculum_vitae_file:
+            instance.curriculum_vitae = curriculum_vitae_file
+        if certificado_antecedentes_file:
+            instance.certificado_antecedentes = certificado_antecedentes_file
+        if fotocopia_luz_agua_gas_file:
+            instance.fotocopia_luz_agua_gas = fotocopia_luz_agua_gas_file
+        if croquis_domicilio_file:
+            instance.croquis_domicilio = croquis_domicilio_file
+        if fotocopia_licencia_conducir_file:
+            instance.fotocopia_licencia_conducir = fotocopia_licencia_conducir_file
+        
+        # Save again if any file fields were assigned/updated
+        if any([foto_file, fotocopia_ci_file, curriculum_vitae_file, certificado_antecedentes_file, fotocopia_luz_agua_gas_file, croquis_domicilio_file, fotocopia_licencia_conducir_file]):
+            instance.save() 
 
         # Handle nested updates. This is a simple implementation: delete old and create new.
         # A more complex implementation would update existing objects by ID.
@@ -164,7 +224,8 @@ class EmpleadoSerializer(serializers.ModelSerializer):
             for contrato_data in contratos_data:
                 Contrato.objects.create(empleado=instance, **contrato_data)
         
-        instance.save()
+        # This instance.save() was already here, keep it for other non-file field updates
+        instance.save() 
         return instance
 
 # Simple serializers for the dropdowns

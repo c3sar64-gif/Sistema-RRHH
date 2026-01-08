@@ -1,8 +1,9 @@
 // src/pages/EmployeePage.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../AuthContext';
+import { SearchableSelect } from '../components/SearchableSelect'; // Importar SearchableSelect
 
 interface Employee {
   id: number;
@@ -15,17 +16,28 @@ interface Employee {
   celular: string;
 }
 
+// Interfaz para el formato de opciones de SearchableSelect
+interface SelectOption {
+  id: number;
+  nombre: string;
+}
+
 export const EmployeePage: React.FC = () => {
   const { token } = useAuth();
   const navigate = useNavigate();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Eliminar searchTerm y debouncedSearchTerm, ya no son necesarios para la búsqueda directa aquí
+  const [selectedEmployee, setSelectedEmployee] = useState<SelectOption | null>(null); // Nuevo estado para el empleado seleccionado
 
-  const fetchEmployees = async () => {
+  const fetchEmployees = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await axios.get('http://127.0.0.1:8000/api/empleados/', {
+      // Ahora siempre traemos todos los empleados o una lista completa para el SearchableSelect
+      const url = 'http://127.0.0.1:8000/api/empleados/'; // Obtener todos los empleados
+      
+      const response = await axios.get(url, {
         headers: { 'Authorization': `Token ${token}` }
       });
       if (response.data && Array.isArray(response.data)) {
@@ -38,17 +50,25 @@ export const EmployeePage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]); // token como única dependencia, ya no depende de debouncedSearchTerm
 
-  useEffect(() => { fetchEmployees(); }, [token]);
+  useEffect(() => { fetchEmployees(); }, [fetchEmployees]);
+
+  // Manejador para cuando se selecciona un empleado del SearchableSelect
+  const handleEmployeeSelect = (employeeOption: SelectOption | null) => {
+    setSelectedEmployee(employeeOption);
+    if (employeeOption) {
+      navigate(`/empleados/ver/${employeeOption.id}`); // Navegar al detalle del empleado seleccionado
+    }
+  };
 
   const handleDelete = async (id: number) => {
     if (window.confirm('¿Estás seguro de que quieres eliminar este empleado?')) {
       try {
-        await axios.delete(`http://127.0.0.1:8000/api/empleados/${id}/`, {
+        await axios.delete(`http://127.0.0.1:8000/api/empleados/${id}/`, { // Corregir la URL del backend
           headers: { 'Authorization': `Token ${token}` }
         });
-        fetchEmployees(); // Refresh list
+        fetchEmployees(); // Actualizar lista
       } catch (err) {
         setError('No se pudo eliminar el empleado.');
       }
@@ -58,6 +78,12 @@ export const EmployeePage: React.FC = () => {
   if (loading) return <div>Cargando empleados...</div>;
   if (error) return <div className="text-red-500 bg-red-100 p-4 rounded-lg">{error}</div>;
 
+  // Mapear los empleados a un formato compatible con SearchableSelect
+  const employeeOptions: SelectOption[] = employees.map(emp => ({
+    id: emp.id,
+    nombre: `${emp.nombres} ${emp.apellido_paterno} ${emp.apellido_materno}`
+  }));
+
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
@@ -65,6 +91,16 @@ export const EmployeePage: React.FC = () => {
         <button onClick={() => navigate('/empleados/nuevo')} className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 font-semibold shadow-md">
           Crear Nuevo Empleado
         </button>
+      </div>
+
+      {/* Barra de búsqueda con SearchableSelect */}
+      <div className="mb-6">
+        <SearchableSelect
+          options={employeeOptions}
+          selected={selectedEmployee}
+          onChange={handleEmployeeSelect}
+          label="Buscar empleado"
+        />
       </div>
       <div className="bg-white p-6 rounded-lg shadow-md">
         <div className="overflow-x-auto">

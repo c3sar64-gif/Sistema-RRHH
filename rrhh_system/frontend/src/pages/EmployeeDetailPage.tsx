@@ -79,7 +79,14 @@ export const EmployeeDetailPage: React.FC = () => {
 
       {/* Header */}
       <div className="bg-white p-6 rounded-lg shadow-md flex items-center space-x-6">
-        <img src={employee.foto ? `http://127.0.0.1:8000${employee.foto}` : 'https://via.placeholder.com/150'} alt="Foto de perfil" className="h-32 w-32 rounded-full object-cover border-4 border-gray-200"/>
+        <img 
+            src={employee.foto 
+                ? (employee.foto.startsWith('http') ? employee.foto : `http://127.0.0.1:8000${employee.foto}`)
+                : 'https://via.placeholder.com/150'
+            } 
+            alt="Foto de perfil" 
+            className="h-32 w-32 rounded-full object-cover border-4 border-gray-200"
+        />
         <div>
             <h2 className="text-3xl font-bold text-gray-800">{`${employee.nombres} ${employee.apellido_paterno} ${employee.apellido_materno}`}</h2>
             <p className="text-xl text-indigo-600">{employee.cargo_nombre || 'Cargo no asignado'}</p>
@@ -124,7 +131,15 @@ export const EmployeeDetailPage: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {documentFields.map(({ key, label }) => {
                         const fileUrl = (employee as any)[key];
-                        return fileUrl ? <a key={key} href={`http://127.0.0.1:8000${fileUrl}`} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:text-indigo-800 hover:underline p-3 bg-gray-50 rounded-md truncate">Ver {label}</a> : null;
+                        if (fileUrl) {
+                            const fullUrl = fileUrl.startsWith('http') ? fileUrl : `http://127.0.0.1:8000${fileUrl}`;
+                            return (
+                                <a key={key} href={fullUrl} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:text-indigo-800 hover:underline p-3 bg-gray-50 rounded-md truncate">
+                                    Ver {label}
+                                </a>
+                            );
+                        }
+                        return null;
                     })}
                 </div>
             </div>

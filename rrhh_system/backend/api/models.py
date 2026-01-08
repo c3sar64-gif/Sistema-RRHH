@@ -36,7 +36,7 @@ class Empleado(models.Model):
     apellido_paterno = models.CharField(max_length=100)
     apellido_materno = models.CharField(max_length=100, blank=True, null=True)
     ci = models.CharField(max_length=20, unique=True)
-    fecha_nacimiento = models.DateField()
+    fecha_nacimiento = models.DateField(null=True, blank=True)
     sexo = models.CharField(max_length=1, choices=SEXO_CHOICES)
     estado_civil = models.CharField(max_length=1, choices=ESTADO_CIVIL_CHOICES)
     celular = models.CharField(max_length=20)
@@ -71,6 +71,7 @@ class Familiar(models.Model):
     nombre_completo = models.CharField(max_length=200)
     parentesco = models.CharField(max_length=20, choices=PARENTESCO_CHOICES)
     celular = models.CharField(max_length=20, blank=True, null=True)
+    fecha_nacimiento = models.DateField(blank=True, null=True) # New field for children's birth date
     activo = models.BooleanField(default=True)
 
     def __str__(self):

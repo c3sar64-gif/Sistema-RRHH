@@ -68,6 +68,7 @@ from .serializers import (
     FamiliarSerializer, EstudioSerializer, ContratoSerializer, UserSerializer, UserCreateSerializer
 )
 from .permissions import IsAdminUser
+from rest_framework import filters
 
 class EmpleadoViewSet(viewsets.ModelViewSet):
     """
@@ -79,6 +80,8 @@ class EmpleadoViewSet(viewsets.ModelViewSet):
     parser_classes = (MultiPartParser, FormParser)
     permission_classes = [IsAdminUser]
     pagination_class = None # Disable pagination for this viewset
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['nombres', 'apellido_paterno', 'apellido_materno', 'ci']
 
     def _prepare_data_from_request(self, request):
         """
