@@ -26,16 +26,53 @@ export const EmployeePage: React.FC = () => {
   const { token } = useAuth();
   const navigate = useNavigate();
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [allEmployeesForSelect, setAllEmployeesForSelect] = useState<SelectOption[]>([]); // New state for SearchableSelect options
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedEmployee, setSelectedEmployee] = useState<SelectOption | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [searchTerm, setSearchTerm] = useState<SelectOption | null>(null); // Search term is now a selected option
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
 
-  const fetchEmployees = useCallback(async (page: number) => {
+  // Effect to populate allEmployeesForSelect (for the searchable dropdown)
+  useEffect(() => {
+    const fetchAllEmployees = async () => {
+      try {
+        const response = await axios.get('http://127.0.0.1:8000/api/empleados/?no_pagination=true', {
+          headers: { 'Authorization': `Token ${token}` }
+        });
+        if (response.data && Array.isArray(response.data)) {
+          const options = response.data.map((emp: Employee) => ({
+            id: emp.id,
+            nombre: `${emp.nombres} ${emp.apellido_paterno} ${emp.apellido_materno}`
+          }));
+          setAllEmployeesForSelect(options);
+        }
+      } catch (err) {
+        console.error('Error fetching all employees for select:', err);
+      }
+    };
+    fetchAllEmployees();
+  }, [token]);
+
+
+  useEffect(() => {
+    // If a search term (selected employee) is present, use its name for filtering
+    const term = searchTerm ? searchTerm.nombre : '';
+    const handler = setTimeout(() => {
+      setDebouncedSearchTerm(term);
+      setCurrentPage(1); // Reset to first page on new search
+    }, 500); // 500ms debounce delay
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [searchTerm]); // Depend on searchTerm (the selected option)
+
+  const fetchEmployees = useCallback(async (page: number, search: string) => {
     try {
       setLoading(true);
-      const url = `http://127.0.0.1:8000/api/empleados/?page=${page}`;
+      const url = `http://127.0.0.1:8000/api/empleados/?page=${page}&search=${search}`;
       
       const response = await axios.get(url, {
         headers: { 'Authorization': `Token ${token}` }
@@ -56,15 +93,8 @@ export const EmployeePage: React.FC = () => {
   }, [token]);
 
   useEffect(() => {
-    fetchEmployees(currentPage);
-  }, [fetchEmployees, currentPage]);
-
-  const handleEmployeeSelect = (employeeOption: SelectOption | null) => {
-    setSelectedEmployee(employeeOption);
-    if (employeeOption) {
-      navigate(`/empleados/ver/${employeeOption.id}`);
-    }
-  };
+    fetchEmployees(currentPage, debouncedSearchTerm);
+  }, [fetchEmployees, currentPage, debouncedSearchTerm]);
 
   const handleDelete = async (id: number) => {
     if (window.confirm('¿Estás seguro de que quieres eliminar este empleado?')) {
@@ -72,7 +102,7 @@ export const EmployeePage: React.FC = () => {
         await axios.delete(`http://127.0.0.1:8000/api/empleados/${id}/`, {
           headers: { 'Authorization': `Token ${token}` }
         });
-        fetchEmployees(currentPage); // Refresh list on the current page
+        fetchEmployees(currentPage, debouncedSearchTerm); // Refresh list on the current page
       } catch (err) {
         setError('No se pudo eliminar el empleado.');
       }
@@ -81,11 +111,6 @@ export const EmployeePage: React.FC = () => {
 
   if (loading) return <div>Cargando empleados...</div>;
   if (error) return <div className="text-red-500 bg-red-100 p-4 rounded-lg">{error}</div>;
-
-  const employeeOptions: SelectOption[] = employees.map(emp => ({
-    id: emp.id,
-    nombre: `${emp.nombres} ${emp.apellido_paterno} ${emp.apellido_materno}`
-  }));
 
   return (
     <div>
@@ -96,14 +121,16 @@ export const EmployeePage: React.FC = () => {
         </button>
       </div>
 
-      <div className="mb-6">
+      {/* Barra de búsqueda con SearchableSelect */}
+      <div className="mb-4">
         <SearchableSelect
-          options={employeeOptions}
-          selected={selectedEmployee}
-          onChange={handleEmployeeSelect}
-          label="Buscar empleado"
+          options={allEmployeesForSelect}
+          selected={searchTerm} // Now selected is the actual search term
+          onChange={(option) => setSearchTerm(option as SelectOption | null)}
+          label="Buscar empleado por nombre, apellido o CI"
         />
       </div>
+      
       <div className="bg-white p-6 rounded-lg shadow-md">
         <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">

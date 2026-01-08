@@ -24,6 +24,13 @@ ESTADO_CONTRATO_CHOICES = [('vigente', 'Vigente'), ('finalizado', 'Finalizado'),
 
 class Departamento(models.Model):
     nombre = models.CharField(max_length=100, unique=True)
+    jefe_departamento = models.ForeignKey(
+        'Empleado', 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True, 
+        related_name='departamentos_liderados'
+    )
     def __str__(self): return self.nombre
 
 class Cargo(models.Model):

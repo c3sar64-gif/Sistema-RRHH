@@ -230,9 +230,14 @@ class EmpleadoSerializer(serializers.ModelSerializer):
 
 # Simple serializers for the dropdowns
 class DepartamentoSerializer(serializers.ModelSerializer):
+    jefe_departamento_info = JefeSerializer(source='jefe_departamento', read_only=True)
+
     class Meta:
         model = Departamento
-        fields = ['id', 'nombre']
+        fields = ['id', 'nombre', 'jefe_departamento', 'jefe_departamento_info']
+        extra_kwargs = {
+            'jefe_departamento': {'required': False, 'allow_null': True, 'write_only': True},
+        }
 
 class CargoSerializer(serializers.ModelSerializer):
     class Meta:

@@ -3,8 +3,15 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../AuthContext';
 import { Modal } from '../components/Modal';
+import { SearchableSelect } from '../components/SearchableSelect'; // Importar SearchableSelect
 
 interface Position {
+  id: number;
+  nombre: string;
+}
+
+// Interfaz para el formato de opciones de SearchableSelect
+interface SelectOption {
   id: number;
   nombre: string;
 }
@@ -12,20 +19,53 @@ interface Position {
 export const PositionPage: React.FC = () => {
   const { token } = useAuth();
   const [positions, setPositions] = useState<Position[]>([]);
+  const [allPositionsForSelect, setAllPositionsForSelect] = useState<SelectOption[]>([]); // New state for SearchableSelect options
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [searchTerm, setSearchTerm] = useState<SelectOption | null>(null); // Search term is now a selected option
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPosition, setEditingPosition] = useState<Position | null>(null);
   const [positionName, setPositionName] = useState('');
 
-  const fetchPositions = async (page: number) => {
+  // Effect to populate allPositionsForSelect (for the searchable dropdown)
+  useEffect(() => {
+    const fetchAllPositions = async () => {
+      try {
+        const response = await axios.get('http://127.0.0.1:8000/api/cargos/?no_pagination=true', {
+          headers: { 'Authorization': `Token ${token}` }
+        });
+        if (response.data && Array.isArray(response.data)) {
+          setAllPositionsForSelect(response.data);
+        }
+      } catch (err) {
+        console.error('Error fetching all positions for select:', err);
+      }
+    };
+    fetchAllPositions();
+  }, [token]);
+
+  useEffect(() => {
+    // If a search term (selected position) is present, use its name for filtering
+    const term = searchTerm ? searchTerm.nombre : '';
+    const handler = setTimeout(() => {
+      setDebouncedSearchTerm(term);
+      setCurrentPage(1); // Reset to first page on new search
+    }, 500); // 500ms debounce delay
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [searchTerm]); // Depend on searchTerm (the selected option)
+
+  const fetchPositions = async (page: number, search: string) => {
     try {
       setLoading(true);
-      const response = await axios.get(`http://127.0.0.1:8000/api/cargos/?page=${page}`, {
+      const response = await axios.get(`http://127.0.0.1:8000/api/cargos/?page=${page}&search=${search}`, {
         headers: { 'Authorization': `Token ${token}` }
       });
       if (response.data && Array.isArray(response.data.results)) {
@@ -42,7 +82,7 @@ export const PositionPage: React.FC = () => {
     }
   };
 
-  useEffect(() => { fetchPositions(currentPage); }, [token, currentPage]);
+  useEffect(() => { fetchPositions(currentPage, debouncedSearchTerm); }, [token, currentPage, debouncedSearchTerm]);
 
   const openModal = (pos: Position | null) => {
     setEditingPosition(pos);
@@ -72,7 +112,7 @@ export const PositionPage: React.FC = () => {
         headers: { 'Authorization': `Token ${token}` }
       });
       closeModal();
-      fetchPositions(currentPage); // Refresh list
+      fetchPositions(currentPage, debouncedSearchTerm); // Refresh list
     } catch (err: any) {
       setError(`Error al guardar el cargo: ${err.response?.data?.nombre || 'Error desconocido'}`);
     }
@@ -84,7 +124,7 @@ export const PositionPage: React.FC = () => {
         await axios.delete(`http://127.0.0.1:8000/api/cargos/${id}/`, {
           headers: { 'Authorization': `Token ${token}` }
         });
-        fetchPositions(currentPage); // Refresh list
+        fetchPositions(currentPage, debouncedSearchTerm); // Refresh list
       } catch (err) {
         setError('No se pudo eliminar el cargo.');
       }
@@ -101,6 +141,16 @@ export const PositionPage: React.FC = () => {
           Crear Nuevo Cargo
         </button>
       </div>
+
+      <div className="mb-4">
+        <SearchableSelect
+          options={allPositionsForSelect}
+          selected={searchTerm} // Now selected is the actual search term
+          onChange={(option) => setSearchTerm(option as SelectOption | null)}
+          label="Buscar cargos"
+        />
+      </div>
+
       <div className="bg-white p-6 rounded-lg shadow-md">
         <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">

@@ -69,6 +69,7 @@ from .serializers import (
 )
 from .permissions import IsAdminUser
 from rest_framework import filters
+from .pagination import OptionalPagination
 
 class EmpleadoViewSet(viewsets.ModelViewSet):
     """
@@ -79,6 +80,7 @@ class EmpleadoViewSet(viewsets.ModelViewSet):
     serializer_class = EmpleadoSerializer
     parser_classes = (MultiPartParser, FormParser)
     permission_classes = [IsAdminUser]
+    pagination_class = OptionalPagination
     filter_backends = [filters.SearchFilter]
     search_fields = ['nombres', 'apellido_paterno', 'apellido_materno', 'ci']
 
@@ -129,6 +131,9 @@ class DepartamentoViewSet(viewsets.ModelViewSet):
     queryset = Departamento.objects.all().order_by('nombre')
     serializer_class = DepartamentoSerializer
     permission_classes = [IsAdminUser]
+    pagination_class = OptionalPagination
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['nombre']
 
 class CargoViewSet(viewsets.ModelViewSet):
     """
@@ -137,6 +142,9 @@ class CargoViewSet(viewsets.ModelViewSet):
     queryset = Cargo.objects.all().order_by('nombre')
     serializer_class = CargoSerializer
     permission_classes = [IsAdminUser]
+    pagination_class = OptionalPagination
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['nombre']
 
 # Viewsets for the new related models
 # These can be used for managing related objects independently if needed in the future.

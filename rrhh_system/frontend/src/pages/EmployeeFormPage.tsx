@@ -59,14 +59,14 @@ export const EmployeeFormPage: React.FC = () => {
       try {
         axios.defaults.baseURL = 'http://127.0.0.1:8000';
         
-        const cargosRes = await axios.get('/api/cargos/', { headers: { 'Authorization': `Token ${token}` } });
-        setCargos(cargosRes.data.results);
+        const cargosRes = await axios.get('/api/cargos/?no_pagination=true', { headers: { 'Authorization': `Token ${token}` } });
+        setCargos(cargosRes.data);
 
-        const deptosRes = await axios.get('/api/departamentos/', { headers: { 'Authorization': `Token ${token}` } });
-        setDepartamentos(deptosRes.data.results);
+        const deptosRes = await axios.get('/api/departamentos/?no_pagination=true', { headers: { 'Authorization': `Token ${token}` } });
+        setDepartamentos(deptosRes.data);
 
-        const empleadosRes = await axios.get('/api/empleados/', { headers: { 'Authorization': `Token ${token}` } });
-        const jefesData = empleadosRes.data.results.map((e: EmpleadoSimple) => ({...e, nombre: `${e.nombres} ${e.apellido_paterno}`}));
+        const empleadosRes = await axios.get('/api/empleados/?no_pagination=true', { headers: { 'Authorization': `Token ${token}` } });
+        const jefesData = empleadosRes.data.map((e: EmpleadoSimple) => ({...e, nombre: `${e.nombres} ${e.apellido_paterno}`}));
         setJefes(jefesData);
 
         if (isEditing) {

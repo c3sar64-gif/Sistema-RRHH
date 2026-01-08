@@ -3,8 +3,19 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../AuthContext';
 import { Modal } from '../components/Modal';
+import { SearchableSelect } from '../components/SearchableSelect';
 
 interface Department {
+  id: number;
+  nombre: string;
+  jefe_departamento: number | null;
+  jefe_departamento_info: {
+    nombres: string;
+    apellido_paterno: string;
+  } | null;
+}
+
+interface EmpleadoSimple {
   id: number;
   nombre: string;
 }
@@ -12,41 +23,92 @@ interface Department {
 export const DepartmentPage: React.FC = () => {
   const { token } = useAuth();
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [allDepartmentsForSelect, setAllDepartmentsForSelect] = useState<EmpleadoSimple[]>([]); // New state for SearchableSelect options
+  const [jefes, setJefes] = useState<EmpleadoSimple[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [searchTerm, setSearchTerm] = useState<EmpleadoSimple | null>(null); // Search term is now a selected option
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDepartment, setEditingDepartment] = useState<Department | null>(null);
   const [departmentName, setDepartmentName] = useState('');
+  const [jefeId, setJefeId] = useState<number | null>(null);
 
-  const fetchDepartments = async (page: number) => {
+  // Effect to populate allDepartmentsForSelect (for the searchable dropdown)
+  useEffect(() => {
+    const fetchAllDepartments = async () => {
+      try {
+        const response = await axios.get('http://127.0.0.1:8000/api/departamentos/?no_pagination=true', {
+          headers: { 'Authorization': `Token ${token}` }
+        });
+        if (response.data && Array.isArray(response.data)) {
+          setAllDepartmentsForSelect(response.data);
+        }
+      } catch (err) {
+        console.error('Error fetching all departments for select:', err);
+      }
+    };
+    fetchAllDepartments();
+  }, [token]);
+
+
+  useEffect(() => {
+    // If a search term (selected department) is present, use its name for filtering
+    const term = searchTerm ? searchTerm.nombre : '';
+    const handler = setTimeout(() => {
+      setDebouncedSearchTerm(term);
+      setCurrentPage(1); // Reset to first page on new search
+    }, 500); // 500ms debounce delay
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [searchTerm]); // Depend on searchTerm (the selected option)
+
+  const fetchDepartments = async (page: number, search: string) => {
     try {
       setLoading(true);
-      const response = await axios.get(`http://127.0.0.1:8000/api/departamentos/?page=${page}`, {
-        headers: { 'Authorization': `Token ${token}` }
-      });
-      if (response.data && Array.isArray(response.data.results)) {
-        setDepartments(response.data.results);
-        setTotalPages(Math.ceil(response.data.count / 10)); // Assuming PAGE_SIZE is 10
+      const [deptosRes, empleadosRes] = await Promise.all([
+        axios.get(`http://127.0.0.1:8000/api/departamentos/?page=${page}&search=${search}`, {
+          headers: { 'Authorization': `Token ${token}` },
+        }),
+        axios.get('http://127.0.0.1:8000/api/empleados/?no_pagination=true', { // Fetch all employees for the dropdown
+          headers: { 'Authorization': `Token ${token}` },
+        }),
+      ]);
+
+      if (deptosRes.data && Array.isArray(deptosRes.data.results)) {
+        setDepartments(deptosRes.data.results);
+        setTotalPages(Math.ceil(deptosRes.data.count / 10));
       } else {
         setDepartments([]);
         setTotalPages(1);
       }
+      
+      if (empleadosRes.data && Array.isArray(empleadosRes.data)) {
+        const jefesData = empleadosRes.data.map((e: any) => ({...e, nombre: `${e.nombres} ${e.apellido_paterno}`}));
+        setJefes(jefesData);
+      } else {
+        setJefes([]);
+      }
+
     } catch (err) {
-      setError('No se pudo cargar la lista de departamentos.');
+      setError('No se pudo cargar la lista de departamentos o empleados.');
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { fetchDepartments(currentPage); }, [token, currentPage]);
+  useEffect(() => { fetchDepartments(currentPage, debouncedSearchTerm); }, [token, currentPage, debouncedSearchTerm]);
 
   const openModal = (dept: Department | null) => {
     setEditingDepartment(dept);
     setDepartmentName(dept ? dept.nombre : '');
+    setJefeId(dept ? dept.jefe_departamento : null);
     setIsModalOpen(true);
     setError(null);
   };
@@ -55,27 +117,32 @@ export const DepartmentPage: React.FC = () => {
     setIsModalOpen(false);
     setEditingDepartment(null);
     setDepartmentName('');
+    setJefeId(null);
     setError(null);
   };
 
   const handleSubmit = async () => {
-    const url = editingDepartment 
+    const url = editingDepartment
       ? `http://127.0.0.1:8000/api/departamentos/${editingDepartment.id}/`
       : 'http://127.0.0.1:8000/api/departamentos/';
     
     const method = editingDepartment ? 'put' : 'post';
+    const data = {
+        nombre: departmentName,
+        jefe_departamento: jefeId
+    };
 
     try {
       await axios({
         method: method,
         url: url,
-        data: { nombre: departmentName },
+        data: data,
         headers: { 'Authorization': `Token ${token}` }
       });
       closeModal();
-      fetchDepartments(currentPage); // Refresh list
+      fetchDepartments(currentPage, debouncedSearchTerm); // Refresh list
     } catch (err: any) {
-      setError(`Error al guardar: ${err.response?.data?.nombre || 'El nombre no puede estar vacío.'}`);
+      setError(`Error al guardar: ${JSON.stringify(err.response?.data)}`);
     }
   };
 
@@ -85,7 +152,7 @@ export const DepartmentPage: React.FC = () => {
         await axios.delete(`http://127.0.0.1:8000/api/departamentos/${id}/`, {
           headers: { 'Authorization': `Token ${token}` }
         });
-        fetchDepartments(currentPage); // Refresh list
+        fetchDepartments(currentPage, debouncedSearchTerm); // Refresh list
       } catch (err) {
         setError('No se pudo eliminar el departamento. Es posible que esté en uso por algún empleado.');
       }
@@ -102,12 +169,23 @@ export const DepartmentPage: React.FC = () => {
           Crear Nuevo Departamento
         </button>
       </div>
+
+      <div className="mb-4">
+        <SearchableSelect
+          options={allDepartmentsForSelect}
+          selected={searchTerm} // Now selected is the actual search term
+          onChange={(option) => setSearchTerm(option as EmpleadoSimple | null)}
+          label="Buscar departamentos"
+        />
+      </div>
+
       <div className="bg-white p-6 rounded-lg shadow-md">
         <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                     <tr>
                         <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre del Departamento</th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Jefe de Departamento</th>
                         <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
                     </tr>
                 </thead>
@@ -115,6 +193,7 @@ export const DepartmentPage: React.FC = () => {
                     {departments.map((dept) => (
                         <tr key={dept.id}>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{dept.nombre}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{dept.jefe_departamento_info ? `${dept.jefe_departamento_info.nombres} ${dept.jefe_departamento_info.apellido_paterno}` : 'N/A'}</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-right">
                                 <button onClick={() => openModal(dept)} className="text-indigo-600 hover:text-indigo-900 mr-4">Editar</button>
                                 <button onClick={() => handleDelete(dept.id)} className="text-red-600 hover:text-red-900">Eliminar</button>
@@ -157,6 +236,14 @@ export const DepartmentPage: React.FC = () => {
                       value={departmentName} 
                       onChange={(e) => setDepartmentName(e.target.value)} 
                       className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2.5" 
+                    />
+                </div>
+                <div>
+                    <SearchableSelect
+                        label="Jefe de Departamento"
+                        options={jefes}
+                        selected={jefes.find(j => j.id === jefeId) || null}
+                        onChange={(option) => setJefeId(option ? option.id : null)}
                     />
                 </div>
             </div>
