@@ -60,13 +60,13 @@ export const EmployeeFormPage: React.FC = () => {
         axios.defaults.baseURL = 'http://127.0.0.1:8000';
         
         const cargosRes = await axios.get('/api/cargos/', { headers: { 'Authorization': `Token ${token}` } });
-        setCargos(cargosRes.data);
+        setCargos(cargosRes.data.results);
 
         const deptosRes = await axios.get('/api/departamentos/', { headers: { 'Authorization': `Token ${token}` } });
-        setDepartamentos(deptosRes.data);
+        setDepartamentos(deptosRes.data.results);
 
         const empleadosRes = await axios.get('/api/empleados/', { headers: { 'Authorization': `Token ${token}` } });
-        const jefesData = empleadosRes.data.map((e: EmpleadoSimple) => ({...e, nombre: `${e.nombres} ${e.apellido_paterno}`}));
+        const jefesData = empleadosRes.data.results.map((e: EmpleadoSimple) => ({...e, nombre: `${e.nombres} ${e.apellido_paterno}`}));
         setJefes(jefesData);
 
         if (isEditing) {
@@ -136,7 +136,7 @@ export const EmployeeFormPage: React.FC = () => {
     // Validate nested data (simplified: check if any item in a list has an empty required field)
     employeeData.familiares.forEach((f, index) => {
       if (!f.nombre_completo.trim()) newErrors[`familiares_${index}_nombre_completo`] = 'Nombre completo requerido.';
-      if (!f.parentesco.trim()) newErrors[`familiares_${index}_parentesco`] = 'Parentesco requerido.';
+      if (f.parentesco !== 'hijo/a' && !f.parentesco.trim()) newErrors[`familiares_${index}_parentesco`] = 'Parentesco requerido.';
     });
     employeeData.estudios.forEach((e, index) => {
         if (!e.nivel.trim()) newErrors[`estudios_${index}_nivel`] = 'Nivel de estudio requerido.';
@@ -568,11 +568,12 @@ export const EmployeeFormPage: React.FC = () => {
                 {errors.fecha_ingreso_inicial && <p className="mt-1 text-xs text-red-500">{errors.fecha_ingreso_inicial}</p>}
             </div>
             <div>
-              <label htmlFor="departamento" className="block text-sm font-medium text-gray-700">Departamento (Sector)</label>
-              <select id="departamento" name="departamento" value={employeeData.departamento || ''} onChange={handleChange} className={`${inputStyles} ${errors.departamento ? 'border-red-500' : 'border-gray-300'}`}>
-                <option value="">Seleccionar...</option>
-                {departamentos.map(d => <option key={d.id} value={d.id}>{d.nombre}</option>)}
-              </select>
+              <SearchableSelect 
+                label="Departamento (Sector)" 
+                options={departamentos} 
+                selected={departamentos.find(d => d.id === employeeData.departamento) || null} 
+                onChange={(option) => handleSelectChange('departamento', option as Option)} 
+              />
               {errors.departamento && <p className="mt-1 text-xs text-red-500">{errors.departamento}</p>}
             </div>
             <div>

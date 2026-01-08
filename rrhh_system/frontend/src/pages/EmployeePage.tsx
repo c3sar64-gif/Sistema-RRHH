@@ -28,47 +28,51 @@ export const EmployeePage: React.FC = () => {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  // Eliminar searchTerm y debouncedSearchTerm, ya no son necesarios para la búsqueda directa aquí
-  const [selectedEmployee, setSelectedEmployee] = useState<SelectOption | null>(null); // Nuevo estado para el empleado seleccionado
+  const [selectedEmployee, setSelectedEmployee] = useState<SelectOption | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
-  const fetchEmployees = useCallback(async () => {
+  const fetchEmployees = useCallback(async (page: number) => {
     try {
       setLoading(true);
-      // Ahora siempre traemos todos los empleados o una lista completa para el SearchableSelect
-      const url = 'http://127.0.0.1:8000/api/empleados/'; // Obtener todos los empleados
+      const url = `http://127.0.0.1:8000/api/empleados/?page=${page}`;
       
       const response = await axios.get(url, {
         headers: { 'Authorization': `Token ${token}` }
       });
-      if (response.data && Array.isArray(response.data)) {
-        setEmployees(response.data);
+      
+      if (response.data && Array.isArray(response.data.results)) {
+        setEmployees(response.data.results);
+        setTotalPages(Math.ceil(response.data.count / 10)); // Assuming PAGE_SIZE is 10
       } else {
         setEmployees([]);
+        setTotalPages(1);
       }
     } catch (err) {
       setError('No se pudo cargar la lista de empleados.');
     } finally {
       setLoading(false);
     }
-  }, [token]); // token como única dependencia, ya no depende de debouncedSearchTerm
+  }, [token]);
 
-  useEffect(() => { fetchEmployees(); }, [fetchEmployees]);
+  useEffect(() => {
+    fetchEmployees(currentPage);
+  }, [fetchEmployees, currentPage]);
 
-  // Manejador para cuando se selecciona un empleado del SearchableSelect
   const handleEmployeeSelect = (employeeOption: SelectOption | null) => {
     setSelectedEmployee(employeeOption);
     if (employeeOption) {
-      navigate(`/empleados/ver/${employeeOption.id}`); // Navegar al detalle del empleado seleccionado
+      navigate(`/empleados/ver/${employeeOption.id}`);
     }
   };
 
   const handleDelete = async (id: number) => {
     if (window.confirm('¿Estás seguro de que quieres eliminar este empleado?')) {
       try {
-        await axios.delete(`http://127.0.0.1:8000/api/empleados/${id}/`, { // Corregir la URL del backend
+        await axios.delete(`http://127.0.0.1:8000/api/empleados/${id}/`, {
           headers: { 'Authorization': `Token ${token}` }
         });
-        fetchEmployees(); // Actualizar lista
+        fetchEmployees(currentPage); // Refresh list on the current page
       } catch (err) {
         setError('No se pudo eliminar el empleado.');
       }
@@ -78,7 +82,6 @@ export const EmployeePage: React.FC = () => {
   if (loading) return <div>Cargando empleados...</div>;
   if (error) return <div className="text-red-500 bg-red-100 p-4 rounded-lg">{error}</div>;
 
-  // Mapear los empleados a un formato compatible con SearchableSelect
   const employeeOptions: SelectOption[] = employees.map(emp => ({
     id: emp.id,
     nombre: `${emp.nombres} ${emp.apellido_paterno} ${emp.apellido_materno}`
@@ -93,7 +96,6 @@ export const EmployeePage: React.FC = () => {
         </button>
       </div>
 
-      {/* Barra de búsqueda con SearchableSelect */}
       <div className="mb-6">
         <SearchableSelect
           options={employeeOptions}
@@ -132,6 +134,25 @@ export const EmployeePage: React.FC = () => {
                     ))}
                 </tbody>
             </table>
+        </div>
+        <div className="mt-4 flex justify-between items-center">
+            <button 
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} 
+                disabled={currentPage === 1}
+                className="px-4 py-2 bg-gray-300 text-gray-800 rounded-md disabled:opacity-50"
+            >
+                Anterior
+            </button>
+            <span>
+                Página {currentPage} de {totalPages}
+            </span>
+            <button 
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} 
+                disabled={currentPage === totalPages}
+                className="px-4 py-2 bg-gray-300 text-gray-800 rounded-md disabled:opacity-50"
+            >
+                Siguiente
+            </button>
         </div>
       </div>
     </div>

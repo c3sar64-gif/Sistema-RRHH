@@ -14,22 +14,26 @@ export const PositionPage: React.FC = () => {
   const [positions, setPositions] = useState<Position[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPosition, setEditingPosition] = useState<Position | null>(null);
   const [positionName, setPositionName] = useState('');
 
-  const fetchPositions = async () => {
+  const fetchPositions = async (page: number) => {
     try {
       setLoading(true);
-      const response = await axios.get('http://127.0.0.1:8000/api/cargos/', {
+      const response = await axios.get(`http://127.0.0.1:8000/api/cargos/?page=${page}`, {
         headers: { 'Authorization': `Token ${token}` }
       });
-      if (response.data && Array.isArray(response.data)) {
-        setPositions(response.data);
+      if (response.data && Array.isArray(response.data.results)) {
+        setPositions(response.data.results);
+        setTotalPages(Math.ceil(response.data.count / 10)); // Assuming PAGE_SIZE is 10
       } else {
         setPositions([]);
+        setTotalPages(1);
       }
     } catch (err) {
       setError('No se pudo cargar la lista de cargos.');
@@ -38,7 +42,7 @@ export const PositionPage: React.FC = () => {
     }
   };
 
-  useEffect(() => { fetchPositions(); }, [token]);
+  useEffect(() => { fetchPositions(currentPage); }, [token, currentPage]);
 
   const openModal = (pos: Position | null) => {
     setEditingPosition(pos);
@@ -68,7 +72,7 @@ export const PositionPage: React.FC = () => {
         headers: { 'Authorization': `Token ${token}` }
       });
       closeModal();
-      fetchPositions(); // Refresh list
+      fetchPositions(currentPage); // Refresh list
     } catch (err: any) {
       setError(`Error al guardar el cargo: ${err.response?.data?.nombre || 'Error desconocido'}`);
     }
@@ -80,7 +84,7 @@ export const PositionPage: React.FC = () => {
         await axios.delete(`http://127.0.0.1:8000/api/cargos/${id}/`, {
           headers: { 'Authorization': `Token ${token}` }
         });
-        fetchPositions(); // Refresh list
+        fetchPositions(currentPage); // Refresh list
       } catch (err) {
         setError('No se pudo eliminar el cargo.');
       }
@@ -118,6 +122,25 @@ export const PositionPage: React.FC = () => {
                     ))}
                 </tbody>
             </table>
+        </div>
+        <div className="mt-4 flex justify-between items-center">
+            <button 
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} 
+                disabled={currentPage === 1}
+                className="px-4 py-2 bg-gray-300 text-gray-800 rounded-md disabled:opacity-50"
+            >
+                Anterior
+            </button>
+            <span>
+                Página {currentPage} de {totalPages}
+            </span>
+            <button 
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} 
+                disabled={currentPage === totalPages}
+                className="px-4 py-2 bg-gray-300 text-gray-800 rounded-md disabled:opacity-50"
+            >
+                Siguiente
+            </button>
         </div>
       </div>
 

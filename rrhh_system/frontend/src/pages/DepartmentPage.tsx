@@ -14,22 +14,26 @@ export const DepartmentPage: React.FC = () => {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDepartment, setEditingDepartment] = useState<Department | null>(null);
   const [departmentName, setDepartmentName] = useState('');
 
-  const fetchDepartments = async () => {
+  const fetchDepartments = async (page: number) => {
     try {
       setLoading(true);
-      const response = await axios.get('http://127.0.0.1:8000/api/departamentos/', {
+      const response = await axios.get(`http://127.0.0.1:8000/api/departamentos/?page=${page}`, {
         headers: { 'Authorization': `Token ${token}` }
       });
-      if (response.data && Array.isArray(response.data)) {
-        setDepartments(response.data);
+      if (response.data && Array.isArray(response.data.results)) {
+        setDepartments(response.data.results);
+        setTotalPages(Math.ceil(response.data.count / 10)); // Assuming PAGE_SIZE is 10
       } else {
         setDepartments([]);
+        setTotalPages(1);
       }
     } catch (err) {
       setError('No se pudo cargar la lista de departamentos.');
@@ -38,7 +42,7 @@ export const DepartmentPage: React.FC = () => {
     }
   };
 
-  useEffect(() => { fetchDepartments(); }, [token]);
+  useEffect(() => { fetchDepartments(currentPage); }, [token, currentPage]);
 
   const openModal = (dept: Department | null) => {
     setEditingDepartment(dept);
@@ -69,7 +73,7 @@ export const DepartmentPage: React.FC = () => {
         headers: { 'Authorization': `Token ${token}` }
       });
       closeModal();
-      fetchDepartments(); // Refresh list
+      fetchDepartments(currentPage); // Refresh list
     } catch (err: any) {
       setError(`Error al guardar: ${err.response?.data?.nombre || 'El nombre no puede estar vacío.'}`);
     }
@@ -81,7 +85,7 @@ export const DepartmentPage: React.FC = () => {
         await axios.delete(`http://127.0.0.1:8000/api/departamentos/${id}/`, {
           headers: { 'Authorization': `Token ${token}` }
         });
-        fetchDepartments(); // Refresh list
+        fetchDepartments(currentPage); // Refresh list
       } catch (err) {
         setError('No se pudo eliminar el departamento. Es posible que esté en uso por algún empleado.');
       }
@@ -119,6 +123,25 @@ export const DepartmentPage: React.FC = () => {
                     ))}
                 </tbody>
             </table>
+        </div>
+        <div className="mt-4 flex justify-between items-center">
+            <button 
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} 
+                disabled={currentPage === 1}
+                className="px-4 py-2 bg-gray-300 text-gray-800 rounded-md disabled:opacity-50"
+            >
+                Anterior
+            </button>
+            <span>
+                Página {currentPage} de {totalPages}
+            </span>
+            <button 
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} 
+                disabled={currentPage === totalPages}
+                className="px-4 py-2 bg-gray-300 text-gray-800 rounded-md disabled:opacity-50"
+            >
+                Siguiente
+            </button>
         </div>
       </div>
 
