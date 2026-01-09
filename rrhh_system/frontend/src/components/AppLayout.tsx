@@ -22,7 +22,7 @@ export const AppLayout: React.FC = () => {
       {/* Sidebar */}
       <div className="hidden md:flex flex-col w-64 bg-gray-800">
         <div className="flex items-center justify-center h-20 shadow-md">
-          <h1 className="text-2xl font-bold text-white">RRHH System</h1>
+          <h1 className="text-2xl font-bold text-white">Recursos Humanos</h1>
         </div>
         <div className="flex flex-col flex-grow p-4">
           <nav className="flex-grow">
