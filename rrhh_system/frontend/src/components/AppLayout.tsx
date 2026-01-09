@@ -16,7 +16,11 @@ export const AppLayout: React.FC = () => {
   const navLinkClasses = "flex items-center px-4 py-2 mt-2 text-gray-100 hover:bg-gray-700 rounded-md";
   const activeNavLinkClasses = "bg-gray-700";
 
-  const isAdmin = user?.is_superuser || user?.groups.some(group => group.name === 'Admin');
+  const isAdmin = user?.is_superuser || user?.groups.some(g => g.name === 'Admin');
+  const isRRHH = user?.groups.some(g => g.name === 'RRHH');
+  const isEncargado = user?.groups.some(g => g.name === 'Encargado');
+
+  const canManageCore = isAdmin || isRRHH || isEncargado;
 
   return (
     <div className="flex h-screen bg-gray-200 font-sans">
@@ -27,18 +31,22 @@ export const AppLayout: React.FC = () => {
         </div>
         <div className="flex flex-col flex-grow p-4">
           <nav className="flex-grow">
-            <NavLink to="/empleados" className={({ isActive }) => `${navLinkClasses} ${isActive ? activeNavLinkClasses : ''}`}>
-              <UsersIcon />
-              <span className="mx-4">Empleados</span>
-            </NavLink>
-            <NavLink to="/departamentos" className={({ isActive }) => `${navLinkClasses} ${isActive ? activeNavLinkClasses : ''}`}>
-              <OfficeBuildingIcon />
-              <span className="mx-4">Departamentos</span>
-            </NavLink>
-            <NavLink to="/cargos" className={({ isActive }) => `${navLinkClasses} ${isActive ? activeNavLinkClasses : ''}`}>
-              <BriefcaseIcon />
-              <span className="mx-4">Cargos</span>
-            </NavLink>
+            {canManageCore && (
+              <>
+                <NavLink to="/empleados" className={({ isActive }) => `${navLinkClasses} ${isActive ? activeNavLinkClasses : ''}`}>
+                  <UsersIcon />
+                  <span className="mx-4">Empleados</span>
+                </NavLink>
+                <NavLink to="/departamentos" className={({ isActive }) => `${navLinkClasses} ${isActive ? activeNavLinkClasses : ''}`}>
+                  <OfficeBuildingIcon />
+                  <span className="mx-4">Departamentos</span>
+                </NavLink>
+                <NavLink to="/cargos" className={({ isActive }) => `${navLinkClasses} ${isActive ? activeNavLinkClasses : ''}`}>
+                  <BriefcaseIcon />
+                  <span className="mx-4">Cargos</span>
+                </NavLink>
+              </>
+            )}
             <NavLink to="/permisos" className={({ isActive }) => `${navLinkClasses} ${isActive ? activeNavLinkClasses : ''}`}>
               <ClockIcon />
               <span className="mx-4">Permisos</span>

@@ -249,15 +249,17 @@ class CargoSerializer(serializers.ModelSerializer):
 
 class PermisoSerializer(serializers.ModelSerializer):
     empleado_info = JefeSerializer(source='empleado', read_only=True)
-    jefe_departamento_info = JefeSerializer(source='jefe_departamento', read_only=True)
-    departamento_info = DepartamentoSerializer(source='departamento', read_only=True)
+    aprobador_asignado_info = JefeSerializer(source='aprobador_asignado', read_only=True)
 
     class Meta:
         model = Permiso
         fields = '__all__'
         read_only_fields = [
+            'empleado',
             'empleado_info',
-            'jefe_departamento_info',
-            'departamento_info',
+            'aprobador_asignado',
+            'aprobador_asignado_info',
             'fecha_solicitud',
+            'fecha_aprobacion',
+            'comentario_aprobador',
         ]

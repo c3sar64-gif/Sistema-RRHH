@@ -111,7 +111,7 @@ export const EmployeeDetailPage: React.FC = () => {
         <img 
             src={employee.foto 
                 ? (employee.foto.startsWith('http') ? employee.foto : `http://127.0.0.1:8000${employee.foto}`)
-                : 'https://via.placeholder.com/150'
+                : '/vite.svg'
             } 
             alt="Foto de perfil" 
             className="h-32 w-32 rounded-full object-cover border-4 border-gray-200 print:h-20 print:w-20"
