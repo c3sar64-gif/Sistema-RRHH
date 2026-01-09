@@ -18,6 +18,7 @@ import { PositionPage } from './pages/PositionPage';
 import { UserAdminPage } from './pages/UserAdminPage';
 import { EmployeeFormPage } from './pages/EmployeeFormPage';
 import { EmployeeDetailPage } from './pages/EmployeeDetailPage';
+import { PermisosPage } from './pages/PermisosPage';
 
 // Componente para manejar la ruta raíz
 const Root = () => {
@@ -49,6 +50,7 @@ const App: React.FC = () => {
 
           <Route path="departamentos" element={<DepartmentPage />} />
           <Route path="cargos" element={<PositionPage />} />
+          <Route path="permisos" element={<PermisosPage />} />
           <Route path="admin-usuarios" element={<UserAdminPage />} />
         </Route>
       </Route>

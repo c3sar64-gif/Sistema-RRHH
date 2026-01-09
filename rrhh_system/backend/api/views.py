@@ -1,16 +1,23 @@
-from rest_framework import viewsets, generics, status
-from rest_framework.permissions import AllowAny
+from rest_framework import viewsets, generics, status, filters
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework.response import Response
 from django.contrib.auth.models import User, Group
-from django.db import transaction
+from django.db import transaction, models
+from django.utils import timezone
+import json
+
 from .models import (
-    Empleado, Departamento, Cargo, Familiar, Estudio, Contrato
+    Empleado, Departamento, Cargo, Familiar, Estudio, Contrato, Permiso
 )
 from .serializers import (
     EmpleadoSerializer, DepartamentoSerializer, CargoSerializer,
-    FamiliarSerializer, EstudioSerializer, ContratoSerializer, UserSerializer, UserCreateSerializer
+    FamiliarSerializer, EstudioSerializer, ContratoSerializer, UserSerializer, UserCreateSerializer,
+    JefeSerializer, PermisoSerializer
 )
 from .permissions import IsAdminUser
+from .pagination import OptionalPagination
 
 class UserViewSet(viewsets.ModelViewSet):
     """
@@ -22,26 +29,17 @@ class UserViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAdminUser]
 
     def partial_update(self, request, *args, **kwargs):
-        """
-        Custom update to handle changing a user's group (role).
-        """
         instance = self.get_object()
         role_name = request.data.get('role')
-
         if not role_name:
             return Response({"error": "El campo 'role' es requerido."}, status=status.HTTP_400_BAD_REQUEST)
-
         try:
             new_group = Group.objects.get(name=role_name)
         except Group.DoesNotExist:
             return Response({"error": f"El grupo '{role_name}' no existe."}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Usar una transacción para asegurar la integridad de los datos
         with transaction.atomic():
             instance.groups.clear()
             instance.groups.add(new_group)
-        
-        # Devolver el objeto de usuario actualizado
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
 
@@ -54,24 +52,6 @@ class UserCreate(generics.CreateAPIView):
     serializer_class = UserCreateSerializer
     permission_classes = [IsAdminUser]
 
-from rest_framework import viewsets, generics, status
-from rest_framework.permissions import AllowAny
-from rest_framework.parsers import MultiPartParser, FormParser
-from django.contrib.auth.models import User, Group
-from django.db import transaction
-import json
-from .models import (
-    Empleado, Departamento, Cargo, Familiar, Estudio, Contrato
-)
-from .serializers import (
-    EmpleadoSerializer, DepartamentoSerializer, CargoSerializer,
-    FamiliarSerializer, EstudioSerializer, ContratoSerializer, UserSerializer, UserCreateSerializer,
-    JefeSerializer
-)
-from .permissions import IsAdminUser
-from rest_framework import filters
-from .pagination import OptionalPagination
-
 class JefesDepartamentoListView(generics.ListAPIView):
     """
     API endpoint that provides a list of employees who are heads of a department.
@@ -79,12 +59,11 @@ class JefesDepartamentoListView(generics.ListAPIView):
     queryset = Empleado.objects.filter(departamentos_liderados__isnull=False).distinct().order_by('nombres', 'apellido_paterno', 'apellido_materno')
     serializer_class = JefeSerializer
     permission_classes = [IsAdminUser]
-    pagination_class = None # We want all jefes, no pagination
+    pagination_class = None
 
 class EmpleadoViewSet(viewsets.ModelViewSet):
     """
     API endpoint that allows employees to be viewed or edited.
-    This viewset supports file uploads.
     """
     queryset = Empleado.objects.all().order_by('nombres', 'apellido_paterno', 'apellido_materno')
     serializer_class = EmpleadoSerializer
@@ -95,27 +74,15 @@ class EmpleadoViewSet(viewsets.ModelViewSet):
     search_fields = ['nombres', 'apellido_paterno', 'apellido_materno', 'ci']
 
     def _prepare_data_from_request(self, request):
-        """
-        Helper to construct a single data dictionary from request.POST, request.FILES,
-        and our custom JSON-string fields.
-        """
-        data = {}
-        # Copy all POST data into our new dict
-        for key, value in request.POST.items():
-            data[key] = value
-
-        # Parse JSON strings into nested data structures
+        data = request.POST.copy()
         if 'familiares_json' in data:
-            data['familiares'] = json.loads(data.pop('familiares_json'))
+            data['familiares'] = json.loads(data.pop('familiares_json')[0])
         if 'contratos_json' in data:
-            data['contratos'] = json.loads(data.pop('contratos_json'))
+            data['contratos'] = json.loads(data.pop('contratos_json')[0])
         if 'estudios_json' in data:
-            data['estudios'] = json.loads(data.pop('estudios_json'))
-
-        # Add file objects to the data
+            data['estudios'] = json.loads(data.pop('estudios_json')[0])
         for key, file in request.FILES.items():
             data[key] = file
-            
         return data
 
     def create(self, request, *args, **kwargs):
@@ -156,34 +123,28 @@ class CargoViewSet(viewsets.ModelViewSet):
     filter_backends = [filters.SearchFilter]
     search_fields = ['nombre']
 
-# Viewsets for the new related models
-# These can be used for managing related objects independently if needed in the future.
-
 class FamiliarViewSet(viewsets.ModelViewSet):
-    """
-    API endpoint for employee's family members.
-    """
     queryset = Familiar.objects.all()
     serializer_class = FamiliarSerializer
+    permission_classes = [IsAdminUser]
 
 class EstudioViewSet(viewsets.ModelViewSet):
-    """
-    API endpoint for employee's education history.
-    """
     queryset = Estudio.objects.all()
     serializer_class = EstudioSerializer
+    permission_classes = [IsAdminUser]
 
 class ContratoViewSet(viewsets.ModelViewSet):
-    """
-    API endpoint for employee's contracts.
-    """
     queryset = Contrato.objects.all()
     serializer_class = ContratoSerializer
+    permission_classes = [IsAdminUser]
 
-# --- Current User View ---
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
+class PermisoViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint for managing hourly permissions.
+    """
+    queryset = Permiso.objects.all().order_by('-fecha_solicitud')
+    serializer_class = PermisoSerializer
+    permission_classes = [IsAuthenticated]
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -193,4 +154,3 @@ def get_current_user(request):
     """
     serializer = UserSerializer(request.user)
     return Response(serializer.data)
-

@@ -2,7 +2,7 @@ from rest_framework import serializers
 from django.db import transaction
 from django.contrib.auth.models import User, Group
 from .models import (
-    Empleado, Departamento, Cargo, Familiar, Estudio, Contrato
+    Empleado, Departamento, Cargo, Familiar, Estudio, Contrato, Permiso
 )
 
 class GroupSerializer(serializers.ModelSerializer):
@@ -236,10 +236,28 @@ class DepartamentoSerializer(serializers.ModelSerializer):
         model = Departamento
         fields = ['id', 'nombre', 'jefe_departamento', 'jefe_departamento_info']
         extra_kwargs = {
-            'jefe_departamento': {'required': False, 'allow_null': True, 'write_only': True},
+            'jefe_departamento': {'required': False, 'allow_null': True},
         }
 
 class CargoSerializer(serializers.ModelSerializer):
+
     class Meta:
+
         model = Cargo
+
         fields = ['id', 'nombre']
+
+class PermisoSerializer(serializers.ModelSerializer):
+    empleado_info = JefeSerializer(source='empleado', read_only=True)
+    jefe_departamento_info = JefeSerializer(source='jefe_departamento', read_only=True)
+    departamento_info = DepartamentoSerializer(source='departamento', read_only=True)
+
+    class Meta:
+        model = Permiso
+        fields = '__all__'
+        read_only_fields = [
+            'empleado_info',
+            'jefe_departamento_info',
+            'departamento_info',
+            'fecha_solicitud',
+        ]

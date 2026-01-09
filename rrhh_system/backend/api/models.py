@@ -38,6 +38,7 @@ class Cargo(models.Model):
     def __str__(self): return self.nombre
 
 class Empleado(models.Model):
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='empleado')
     # Personal Information
     nombres = models.CharField(max_length=100)
     apellido_paterno = models.CharField(max_length=100)
@@ -96,17 +97,60 @@ class Estudio(models.Model):
         return f'{self.get_nivel_display()}: {self.carrera} - {self.empleado}'
 
 class Contrato(models.Model):
+
     empleado = models.ForeignKey(Empleado, on_delete=models.CASCADE, related_name='contratos')
+
     tipo_contrato = models.CharField(max_length=20, choices=TIPO_CONTRATO_CHOICES)
+
     tipo_trabajador = models.CharField(max_length=20, choices=TIPO_TRABAJADOR_CHOICES)
+
     contrato_fiscal = models.CharField(max_length=20, choices=CONTRATO_FISCAL_CHOICES)
+
     fecha_inicio = models.DateField()
+
     fecha_fin = models.DateField(blank=True, null=True)
+
     fecha_fin_pactada = models.DateField(blank=True, null=True)
+
     salario_base = models.DecimalField(max_digits=10, decimal_places=2)
+
     jornada_laboral = models.CharField(max_length=20, choices=JORNADA_LABORAL_CHOICES)
+
     estado_contrato = models.CharField(max_length=20, choices=ESTADO_CONTRATO_CHOICES, default='vigente')
+
     observaciones = models.TextField(blank=True, null=True)
 
+
+
     def __str__(self):
+
         return f'Contrato {self.get_tipo_contrato_display()} para {self.empleado} ({self.fecha_inicio})'
+
+# --- Choices for Permiso ---
+TIPO_PERMISO_CHOICES = [
+    ('trabajo', 'Trabajo'),
+    ('personal', 'Personal'),
+    ('hora_almuerzo', 'Hora Almuerzo'),
+]
+
+ESTADO_PERMISO_CHOICES = [
+    ('pendiente', 'Pendiente'),
+    ('aprobado', 'Aprobado'),
+    ('anulado', 'Anulado'),
+]
+
+# --- Permiso Model ---
+
+class Permiso(models.Model):
+    empleado = models.ForeignKey(Empleado, on_delete=models.CASCADE, related_name='permisos')
+    departamento = models.ForeignKey(Departamento, on_delete=models.SET_NULL, null=True, blank=True)
+    jefe_departamento = models.ForeignKey(Empleado, on_delete=models.SET_NULL, null=True, blank=True, related_name='permisos_aprobados_jefe')
+    fecha_solicitud = models.DateField(auto_now_add=True)
+    tipo_permiso = models.CharField(max_length=20, choices=TIPO_PERMISO_CHOICES)
+    observacion = models.TextField(blank=True, null=True)
+    hora_salida = models.TimeField()
+    hora_regreso = models.TimeField()
+    estado = models.CharField(max_length=20, choices=ESTADO_PERMISO_CHOICES, default='pendiente')
+
+    def __str__(self):
+        return f'Permiso para {self.empleado} - {self.fecha_solicitud}'
