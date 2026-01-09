@@ -76,7 +76,7 @@ class EmpleadoViewSet(viewsets.ModelViewSet):
     API endpoint that allows employees to be viewed or edited.
     This viewset supports file uploads.
     """
-    queryset = Empleado.objects.all().order_by('-fecha_ingreso_inicial')
+    queryset = Empleado.objects.all().order_by('nombres', 'apellido_paterno', 'apellido_materno')
     serializer_class = EmpleadoSerializer
     parser_classes = (MultiPartParser, FormParser)
     permission_classes = [IsAdminUser]

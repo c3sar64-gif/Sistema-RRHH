@@ -69,16 +69,17 @@ export const EmployeeDetailPage: React.FC = () => {
 
   return (
     <div className="space-y-8">
-      <div className="flex justify-between items-center mb-8">
+      <div className="flex justify-between items-center mb-8 print:hidden">
         <h1 className="text-3xl font-bold text-gray-800">Detalle del Empleado</h1>
         <div>
             <Link to="/empleados" className="mr-3 px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 font-semibold">Volver a la Lista</Link>
             <button onClick={() => navigate(`/empleados/editar/${id}`)} className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 font-semibold">Editar Empleado</button>
+            <button onClick={() => window.print()} className="ml-3 px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 font-semibold">Imprimir</button>
         </div>
       </div>
 
       {/* Header */}
-      <div className="bg-white p-6 rounded-lg shadow-md flex items-center space-x-6">
+      <div className="bg-white p-6 rounded-lg shadow-md print:shadow-none print:bg-transparent flex items-center space-x-6">
         <img 
             src={employee.foto 
                 ? (employee.foto.startsWith('http') ? employee.foto : `http://127.0.0.1:8000${employee.foto}`)
@@ -98,7 +99,7 @@ export const EmployeeDetailPage: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-8">
             {/* Info Personal */}
-            <div className="bg-white p-6 rounded-lg shadow-md">
+            <div className="bg-white p-6 rounded-lg shadow-md print:shadow-none print:bg-transparent">
                 <h3 className="text-xl font-bold text-gray-700 mb-6 border-b pb-2">Información Personal</h3>
                 <dl className="grid grid-cols-1 md:grid-cols-3 gap-x-4 gap-y-6">
                     <DetailItem label="CI" value={employee.ci} />
@@ -117,7 +118,7 @@ export const EmployeeDetailPage: React.FC = () => {
             </div>
 
             {/* Info Laboral */}
-             <div className="bg-white p-6 rounded-lg shadow-md">
+             <div className="bg-white p-6 rounded-lg shadow-md print:shadow-none print:bg-transparent">
                 <h3 className="text-xl font-bold text-gray-700 mb-6 border-b pb-2">Información Laboral</h3>
                 <dl className="grid grid-cols-1 md:grid-cols-3 gap-x-4 gap-y-6">
                     <DetailItem label="Fecha Ingreso Inicial" value={employee.fecha_ingreso_inicial} />
@@ -126,7 +127,7 @@ export const EmployeeDetailPage: React.FC = () => {
             </div>
             
             {/* Documentos */}
-            <div className="bg-white p-6 rounded-lg shadow-md">
+            <div className="bg-white p-6 rounded-lg shadow-md print:shadow-none print:bg-transparent">
                 <h3 className="text-xl font-bold text-gray-700 mb-6 border-b pb-2">Documentos</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {documentFields.map(({ key, label }) => {
@@ -147,17 +148,17 @@ export const EmployeeDetailPage: React.FC = () => {
 
         <div className="space-y-8">
             {/* Familiares */}
-            <div className="bg-white p-6 rounded-lg shadow-md">
+            <div className="bg-white p-6 rounded-lg shadow-md print:shadow-none print:bg-transparent">
                 <h3 className="text-xl font-bold text-gray-700 mb-6 border-b pb-2">Familiares</h3>
                 {employee.familiares.map((f, i) => <div key={i} className="mb-4"><p className="font-semibold">{f.nombre_completo}</p><p className="text-sm text-gray-500">{f.parentesco} - {f.celular}</p></div>)}
             </div>
             {/* Estudios */}
-            <div className="bg-white p-6 rounded-lg shadow-md">
+            <div className="bg-white p-6 rounded-lg shadow-md print:shadow-none print:bg-transparent">
                 <h3 className="text-xl font-bold text-gray-700 mb-6 border-b pb-2">Estudios</h3>
                 {employee.estudios.map((e, i) => <div key={i} className="mb-4"><p className="font-semibold">{e.carrera}</p><p className="text-sm text-gray-500">{e.nivel} en {e.institucion} ({e.estado})</p></div>)}
             </div>
             {/* Contratos */}
-            <div className="bg-white p-6 rounded-lg shadow-md">
+            <div className="bg-white p-6 rounded-lg shadow-md print:shadow-none print:bg-transparent">
                 <h3 className="text-xl font-bold text-gray-700 mb-6 border-b pb-2">Contratos</h3>
                 {employee.contratos.map((c, i) => <div key={i} className="mb-4"><p className="font-semibold">{c.tipo_contrato} ({c.estado_contrato})</p><p className="text-sm text-gray-500">Del {c.fecha_inicio} al {c.fecha_fin_pactada}</p><p className="text-sm text-gray-500">Salario: {c.salario_base}</p></div>)}
             </div>

@@ -121,8 +121,7 @@ export const EmployeeFormPage: React.FC = () => {
     if (!employeeData.ci.trim()) newErrors.ci = 'El CI es requerido.';
     if (!employeeData.fecha_nacimiento) newErrors.fecha_nacimiento = 'La fecha de nacimiento es requerida.';
     if (!employeeData.celular.trim()) newErrors.celular = 'El celular es requerido.';
-    if (!employeeData.email.trim()) newErrors.email = 'El email es requerido.';
-    else if (!/\S+@\S+\.\S+/.test(employeeData.email)) newErrors.email = 'El formato del email es inválido.';
+    if (employeeData.email.trim() && !/\S+@\S+\.\S+/.test(employeeData.email)) newErrors.email = 'El formato del email es inválido.';
     if (!employeeData.provincia.trim()) newErrors.provincia = 'La provincia es requerida.';
     if (!employeeData.direccion.trim()) newErrors.direccion = 'La dirección es requerida.';
     if (!employeeData.nacionalidad.trim()) newErrors.nacionalidad = 'La nacionalidad es requerida.';
@@ -238,7 +237,7 @@ export const EmployeeFormPage: React.FC = () => {
   if (loading) return <div>Cargando formulario...</div>;
   if (error) return <div className="text-red-500 bg-red-100 p-4 rounded-lg">{error}</div>;
 
-  const inputStyles = "mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2.5 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500";
+  const inputStyles = "mt-1 block w-full rounded-md border-gray-300 shadow-md p-2.5 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500";
   
   const calculateAge = (birthDateString?: string) => {
     if (!birthDateString) return '';
@@ -467,6 +466,7 @@ export const EmployeeFormPage: React.FC = () => {
                                 className={`${inputStyles} ${errors[`familiares_${originalIndex}_parentesco`] ? 'border-red-500' : 'border-gray-300'}`}
                                 >
                                     <option value="">Seleccionar...</option>
+                                    <option value="hijo/a">Hijo/a</option>
                                     <option value="padre">Padre</option>
                                     <option value="madre">Madre</option>
                                     <option value="esposo/a">Esposo/a</option>
