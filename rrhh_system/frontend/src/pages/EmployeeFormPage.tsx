@@ -65,8 +65,8 @@ export const EmployeeFormPage: React.FC = () => {
         const deptosRes = await axios.get('/api/departamentos/?no_pagination=true', { headers: { 'Authorization': `Token ${token}` } });
         setDepartamentos(deptosRes.data);
 
-        const empleadosRes = await axios.get('/api/empleados/?no_pagination=true', { headers: { 'Authorization': `Token ${token}` } });
-        const jefesData = empleadosRes.data.map((e: EmpleadoSimple) => ({...e, nombre: `${e.nombres} ${e.apellido_paterno}`}));
+        const jefesRes = await axios.get('/api/jefes-departamento/', { headers: { 'Authorization': `Token ${token}` } });
+        const jefesData = jefesRes.data.map((e: EmpleadoSimple) => ({...e, nombre: `${e.nombres} ${e.apellido_paterno} ${e.apellido_materno || ''}`.trim() }));
         setJefes(jefesData);
 
         if (isEditing) {
@@ -491,7 +491,7 @@ export const EmployeeFormPage: React.FC = () => {
                 })}
             </tbody>
         </table>
-        <button type="button" onClick={() => addNestedItem('familiares', { nombre_completo: '', parentesco: 'otro', celular: '' })} className="text-indigo-600 text-sm font-semibold">+ Añadir Contacto</button>
+        <button type="button" onClick={() => addNestedItem('familiares', { nombre_completo: '', parentesco: '', celular: '' })} className="text-indigo-600 text-sm font-semibold">+ Añadir Contacto</button>
       </div>
       <div className="bg-white p-6 rounded-lg shadow-md">
         <h2 className="text-xl font-bold text-gray-700 mb-6 border-b pb-2">3. Formulario de Estudios</h2>

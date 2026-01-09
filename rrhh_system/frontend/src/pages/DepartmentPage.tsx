@@ -12,6 +12,7 @@ interface Department {
   jefe_departamento_info: {
     nombres: string;
     apellido_paterno: string;
+    apellido_materno: string;
   } | null;
 }
 
@@ -193,7 +194,7 @@ export const DepartmentPage: React.FC = () => {
                     {departments.map((dept) => (
                         <tr key={dept.id}>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{dept.nombre}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{dept.jefe_departamento_info ? `${dept.jefe_departamento_info.nombres} ${dept.jefe_departamento_info.apellido_paterno}` : 'N/A'}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{dept.jefe_departamento_info ? `${dept.jefe_departamento_info.nombres} ${dept.jefe_departamento_info.apellido_paterno} ${dept.jefe_departamento_info.apellido_materno || ''}`.trim() : 'N/A'}</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-right">
                                 <button onClick={() => openModal(dept)} className="text-indigo-600 hover:text-indigo-900 mr-4">Editar</button>
                                 <button onClick={() => handleDelete(dept.id)} className="text-red-600 hover:text-red-900">Eliminar</button>

@@ -73,7 +73,7 @@ class ContratoSerializer(serializers.ModelSerializer):
 class JefeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Empleado
-        fields = ['id', 'nombres', 'apellido_paterno']
+        fields = ['id', 'nombres', 'apellido_paterno', 'apellido_materno']
 
 # Now, the main serializer for Empleado, which handles nested writes.
 

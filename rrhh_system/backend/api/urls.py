@@ -2,7 +2,8 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import (
     UserCreate, EmpleadoViewSet, DepartamentoViewSet, CargoViewSet,
-    FamiliarViewSet, EstudioViewSet, ContratoViewSet, get_current_user, UserViewSet
+    FamiliarViewSet, EstudioViewSet, ContratoViewSet, get_current_user, UserViewSet,
+    JefesDepartamentoListView
 )
 
 # Create a router and register our viewsets with it.
@@ -17,6 +18,7 @@ router.register(r'contratos', ContratoViewSet)
 
 # The API URLs are now determined automatically by the router.
 urlpatterns = [
+    path('jefes-departamento/', JefesDepartamentoListView.as_view(), name='jefes-departamento-list'),
     path('register/', UserCreate.as_view(), name='user-create'),
     path('me/', get_current_user, name='current-user'),
     path('', include(router.urls)),

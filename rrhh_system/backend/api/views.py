@@ -65,11 +65,21 @@ from .models import (
 )
 from .serializers import (
     EmpleadoSerializer, DepartamentoSerializer, CargoSerializer,
-    FamiliarSerializer, EstudioSerializer, ContratoSerializer, UserSerializer, UserCreateSerializer
+    FamiliarSerializer, EstudioSerializer, ContratoSerializer, UserSerializer, UserCreateSerializer,
+    JefeSerializer
 )
 from .permissions import IsAdminUser
 from rest_framework import filters
 from .pagination import OptionalPagination
+
+class JefesDepartamentoListView(generics.ListAPIView):
+    """
+    API endpoint that provides a list of employees who are heads of a department.
+    """
+    queryset = Empleado.objects.filter(departamentos_liderados__isnull=False).distinct().order_by('nombres', 'apellido_paterno', 'apellido_materno')
+    serializer_class = JefeSerializer
+    permission_classes = [IsAdminUser]
+    pagination_class = None # We want all jefes, no pagination
 
 class EmpleadoViewSet(viewsets.ModelViewSet):
     """
