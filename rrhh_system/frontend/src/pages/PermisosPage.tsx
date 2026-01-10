@@ -1,12 +1,20 @@
 // src/pages/PermisosPage.tsx
-import React, { useState, useEffect, ChangeEvent } from 'react';
+import React, { useState, useEffect } from 'react';
+import type { ChangeEvent } from 'react';
 import axios from 'axios';
 import { useAuth } from '../AuthContext';
 import { Modal } from '../components/Modal';
 import { Calendar, momentLocalizer } from 'react-big-calendar';
+import type { View } from 'react-big-calendar';
 import moment from 'moment';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import { SearchableSelect } from '../components/SearchableSelect';
+import './CalendarOverrides.css';
+
+import 'moment/locale/es'; // Import Spanish locale
+
+// Set moment locale to Spanish globally
+moment.locale('es');
 
 // Initialize moment localizer
 const localizer = momentLocalizer(moment);
@@ -52,18 +60,68 @@ const initialFormState: PermisoFormState = {
 };
 
 // --- Main Component ---
+// Custom Date Header Component
+// Custom Date Header Component
+const CustomDateHeader = ({ label, date }: { label: string, date: Date }) => {
+    // Determine if the date is today using strict string comparison
+    const isToday = moment(date).format('YYYY-MM-DD') === moment().format('YYYY-MM-DD');
+
+    return (
+        <div className="rbc-date-cell">
+            {isToday ? (
+                <span style={{
+                    display: 'inline-block',
+                    width: '32px',
+                    height: '32px',
+                    lineHeight: '32px',
+                    backgroundColor: '#1a73e8',
+                    color: 'white',
+                    borderRadius: '50%',
+                    textAlign: 'center',
+                    boxShadow: '0 0 0 4px #d2e3fc',
+                    fontWeight: 'bold',
+                    fontSize: '0.9rem'
+                }}>
+                    {label}
+                </span>
+            ) : (
+                label
+            )}
+        </div>
+    );
+};
+
 export const PermisosPage: React.FC = () => {
     const { token, user } = useAuth();
+
+    // Force Spanish locale on mount
+    useEffect(() => {
+        try {
+            require('moment/locale/es');
+            moment.locale('es');
+        } catch (e) {
+            console.error("Error setting locale", e);
+        }
+    }, []);
+
+    const formats = {
+        monthHeaderFormat: (date: Date) => moment(date).format('MMMM YYYY'),
+        weekdayFormat: (date: Date) => moment(date).format('ddd'),
+        dayFormat: (date: Date) => moment(date).format('DD ddd'),
+        dayHeaderFormat: (date: Date) => moment(date).format('dddd DD MMM'),
+    };
+
+    // ... existing state ...
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     const [permisos, setPermisos] = useState<Permiso[]>([]);
-    const [calendarEvents, setCalendarEvents] = useState([]);
-    
+    const [calendarEvents, setCalendarEvents] = useState<any[]>([]);
+
     const [allDepartments, setAllDepartments] = useState<DepartamentoFull[]>([]);
     const [allJefes, setAllJefes] = useState<EmpleadoFull[]>([]);
     const [allEmployees, setAllEmployees] = useState<EmpleadoFull[]>([]);
-    
+
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [formState, setFormState] = useState<PermisoFormState>(initialFormState);
     const [formErrors, setFormErrors] = useState<Record<string, string>>({});
@@ -73,34 +131,51 @@ export const PermisosPage: React.FC = () => {
     const [filteredDepartamentos, setFilteredDepartamentos] = useState<DepartamentoFull[]>([]);
     const [filteredEmpleados, setFilteredEmpleados] = useState<EmpleadoFull[]>([]);
 
-    const isAdminOrHR = user?.is_superuser || user?.groups.some(g => ['Admin', 'RRHH', 'Encargado'].includes(g.name));
+    const [view, setView] = useState<View>('month');
+    const [date, setDate] = useState(new Date());
+    const [viewEvent, setViewEvent] = useState<Permiso | null>(null);
+
+    const isAdminOrHR = user?.is_superuser || user?.groups.some(g => ['Admin', 'RRHH', 'Encargado', 'Jefe de Departamento'].includes(g.name));
+    const isJefeDepto = user?.groups.some(g => g.name === 'Jefe de Departamento');
 
     const fetchData = async () => {
         setLoading(true);
         try {
-            const [permisosRes, departmentsRes, jefesRes, employeesRes] = await Promise.all([
-                axios.get('http://127.0.0.1:8000/api/permisos/', { headers: { 'Authorization': `Token ${token}` } }),
-                axios.get('http://127.0.0.1:8000/api/departamentos/?no_pagination=true', { headers: { 'Authorization': `Token ${token}` } }),
-                axios.get('http://127.0.0.1:8000/api/jefes-departamento/', { headers: { 'Authorization': `Token ${token}` } }),
-                axios.get('http://127.0.0.1:8000/api/empleados/?no_pagination=true', { headers: { 'Authorization': `Token ${token}` } }),
-            ]);
+            // Always fetch permises
+            const permisosRes = await axios.get('http://127.0.0.1:8000/api/permisos/?no_pagination=true', { headers: { 'Authorization': `Token ${token}` } });
 
             const fetchedPermisos = permisosRes.data.results || permisosRes.data;
             setPermisos(fetchedPermisos);
 
-            const events = fetchedPermisos.map((p: Permiso) => ({
-                id: p.id,
-                title: `${p.empleado_info.nombres} ${p.empleado_info.apellido_paterno} - ${p.tipo_permiso}`,
-                start: moment(`${p.fecha_solicitud} ${p.hora_salida}`).toDate(),
-                end: moment(`${p.fecha_solicitud} ${p.hora_regreso}`).toDate(),
-                resource: p,
-            }));
+            const events = fetchedPermisos.map((p: Permiso) => {
+                // Ensure valid date formatting
+                const start = moment(`${p.fecha_solicitud}T${p.hora_salida}`, "YYYY-MM-DDTHH:mm:ss").toDate();
+                const end = moment(`${p.fecha_solicitud}T${p.hora_regreso}`, "YYYY-MM-DDTHH:mm:ss").toDate();
+                return {
+                    id: p.id,
+                    title: `${p.empleado_info.nombres} ${p.empleado_info.apellido_paterno} - ${p.tipo_permiso}`,
+                    start: start,
+                    end: end,
+                    resource: p,
+                };
+            });
+
             setCalendarEvents(events);
 
-            setAllDepartments(departmentsRes.data);
-            setAllJefes(jefesRes.data);
-            setAllEmployees(employeesRes.data.results || employeesRes.data);
+            // Conditional fetch for Admin/HR/Encargado data
+            if (isAdminOrHR) {
+                const [departmentsRes, jefesRes, employeesRes] = await Promise.all([
+                    axios.get('http://127.0.0.1:8000/api/departamentos/?no_pagination=true', { headers: { 'Authorization': `Token ${token}` } }),
+                    axios.get('http://127.0.0.1:8000/api/jefes-departamento/', { headers: { 'Authorization': `Token ${token}` } }),
+                    axios.get('http://127.0.0.1:8000/api/empleados/?no_pagination=true', { headers: { 'Authorization': `Token ${token}` } }),
+                ]);
+                setAllDepartments(departmentsRes.data);
+                setAllJefes(jefesRes.data);
+                setAllEmployees(employeesRes.data.results || employeesRes.data);
+            }
+
         } catch (err) {
+            console.error(err);
             setError('Error al cargar los datos.');
         } finally {
             setLoading(false);
@@ -108,18 +183,46 @@ export const PermisosPage: React.FC = () => {
     };
 
     useEffect(() => {
-        fetchData();
-    }, [token]);
-    
+        if (token && user) {
+            fetchData();
+        }
+    }, [token, user]);
+
+    // Auto-select Jefe for JefeDepto users
+    useEffect(() => {
+        if (isJefeDepto && user?.empleado_id && !selectedJefe) {
+            setSelectedJefe(user.empleado_id);
+        }
+    }, [isJefeDepto, user, selectedJefe]);
+
     useEffect(() => {
         if (selectedJefe) {
             const managedDepts = allDepartments.filter(d => d.jefe_departamento === selectedJefe);
             setFilteredDepartamentos(managedDepts);
+
+            // Auto-select department if only one exists for this Jefe
+            if (managedDepts.length === 1) {
+                setSelectedDepartamento(managedDepts[0].id);
+            } else {
+                // Do not reset if already selected and valid? 
+                // For now, reset to force choice if multiple, or keep if valid.
+                // To keep it simple and safe:
+                if (selectedDepartamento && !managedDepts.find(d => d.id === selectedDepartamento)) {
+                    setSelectedDepartamento(null);
+                } else if (!selectedDepartamento) {
+                    // If nothing selected, stay null
+                    setSelectedDepartamento(null);
+                }
+            }
         } else {
             setFilteredDepartamentos(allDepartments);
+            // Only reset if we were filtering?
+            // If no Jefe selected (Admin view generally), we might want to see all departments?
+            // Code before was: setFilteredDepartamentos(allDepartments); setSelectedDepartamento(null);
+            // I'll stick to clearing department if jefe is cleared, logical hierarchy.
+            setSelectedDepartamento(null);
         }
-        setSelectedDepartamento(null);
-        setFormState(p => ({...p, empleado: null}));
+        setFormState(p => ({ ...p, empleado: null }));
     }, [selectedJefe, allDepartments]);
 
     useEffect(() => {
@@ -129,132 +232,275 @@ export const PermisosPage: React.FC = () => {
         } else {
             setFilteredEmpleados([]);
         }
-        setFormState(p => ({...p, empleado: null}));
+        setFormState(p => ({ ...p, empleado: null }));
     }, [selectedDepartamento, allEmployees]);
 
     const handleInputChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         setFormState(prev => ({ ...prev, [e.target.name]: e.target.value }));
     };
-    
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         let dataToSubmit = { ...formState };
         if (!isAdminOrHR) {
-            if (!user?.empleado?.id) {
-                setFormErrors({ general: "Tu usuario no está vinculado a un perfil de empleado."});
+            if (!user?.empleado_id) {
+                setFormErrors({ general: "Tu usuario no está vinculado a un perfil de empleado." });
                 return;
             }
-            dataToSubmit.empleado = user.empleado.id;
+            dataToSubmit.empleado = user.empleado_id;
         } else {
             if (!formState.empleado) {
-                 setFormErrors({ general: "Debes seleccionar un empleado."});
+                setFormErrors({ general: "Debes seleccionar un empleado." });
                 return;
             }
         }
-        
+
         try {
             await axios.post('http://127.0.0.1:8000/api/permisos/', dataToSubmit, { headers: { 'Authorization': `Token ${token}` } });
             alert('Permiso creado con éxito!');
             setIsModalOpen(false);
+            setFormState(initialFormState);
+            setSelectedJefe(null);
+            setSelectedDepartamento(null);
             fetchData();
         } catch (err: any) {
             setFormErrors({ general: `Error al crear el permiso: ${JSON.stringify(err.response?.data)}` });
         }
     };
-    
+
+    const handleUpdateStatus = async (id: number, newStatus: string) => {
+        try {
+            await axios.patch(`http://127.0.0.1:8000/api/permisos/${id}/`, { estado: newStatus }, { headers: { 'Authorization': `Token ${token}` } });
+            // Update local state to reflect change immediately (optimistic or re-fetch)
+            setPermisos(prev => prev.map(p => p.id === id ? { ...p, estado: newStatus } : p));
+            // Also update calendar events
+            setCalendarEvents(prev => prev.map(e => e.id === id ? { ...e, resource: { ...e.resource, estado: newStatus } } : e));
+
+            // If currently viewing this event, update it too
+            if (viewEvent && viewEvent.id === id) {
+                setViewEvent({ ...viewEvent, estado: newStatus });
+            }
+            alert(`Estado actualizado a: ${newStatus}`);
+        } catch (err: any) {
+            console.error(err);
+            alert("Error al actualizar estado");
+        }
+    };
+
     const inputStyles = "mt-1 block w-full rounded-md border-gray-300 shadow-md p-2.5 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500";
-    
-    const eventPropGetter = (event) => {
+
+    const eventPropGetter = (event: any) => {
         const status = event.resource.estado;
-        let className = 'text-white p-1 text-xs rounded ';
+        let className = '';
         switch (status) {
             case 'aprobado':
-                className += 'bg-green-500';
+                className = 'event-approved';
                 break;
             case 'pendiente':
-                className += 'bg-yellow-500';
+                className = 'event-pending';
                 break;
             case 'anulado':
             case 'rechazado':
-                className += 'bg-red-500';
+                className = 'event-cancelled';
                 break;
             default:
-                className += 'bg-gray-500';
+                className = ''; // Default is purple from CSS
         }
         return { className };
+    };
+
+    const MonthEvent = ({ event }: any) => {
+        return (
+            <div className="text-xs font-semibold truncate px-1">
+                {event.title}
+            </div>
+        );
+    };
+
+    const TimeGridEvent = ({ event }: any) => {
+        return (
+            <div className="h-full w-full flex flex-col justify-start overflow-hidden">
+                <div className="font-bold text-sm mb-1 truncate">{event.resource.empleado_info.nombres} {event.resource.empleado_info.apellido_paterno}</div>
+                <div className="text-xs">
+                    {moment(event.start).format('HH:mm')} - {moment(event.end).format('HH:mm')}
+                </div>
+            </div>
+        );
     };
 
     return (
         <div>
             <div className="flex justify-between items-center mb-6">
-                <h1 className="text-3xl font-bold text-gray-800">Calendario de Permisos</h1>
+                <h1 className="text-3xl font-bold text-gray-800">Permisos</h1>
                 <button onClick={() => setIsModalOpen(true)} className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 font-semibold shadow-md">
                     Registrar Permiso
                 </button>
             </div>
-            
+
             {loading ? <div>Cargando...</div> : error ? <div className="text-red-500 bg-red-100 p-4 rounded-lg">{error}</div> : (
-                <div className="bg-white p-6 rounded-lg shadow-md" style={{ height: '70vh' }}>
+                <div className="bg-white p-6 rounded-lg shadow-md" style={{ height: '85vh' }}>
                     <Calendar
                         localizer={localizer}
                         events={calendarEvents}
                         startAccessor="start"
                         endAccessor="end"
                         style={{ height: '100%' }}
-                        views={['month', 'week', 'day', 'agenda']}
-                        defaultView="week" // Changed default view to week
+                        views={['month', 'week', 'day']}
+                        view={view}
+                        onView={setView}
+                        date={date}
+                        onNavigate={setDate}
                         popup
+                        culture="es"
+                        formats={formats}
+                        selectable
+                        onSelectSlot={(slotInfo) => {
+                            setDate(slotInfo.start);
+                            setView('day');
+                        }}
+                        onSelectEvent={(event) => setViewEvent(event.resource)}
+                        components={{
+                            month: { event: MonthEvent, dateHeader: CustomDateHeader },
+                            week: { event: TimeGridEvent },
+                            day: { event: TimeGridEvent },
+                        }}
                         messages={{
-                            next: "Sig",
-                            previous: "Ant",
+                            next: "Siguiente",
+                            previous: "Anterior",
                             today: "Hoy",
                             month: "Mes",
                             week: "Semana",
                             day: "Día",
-                            agenda: "Agenda",
+                            date: "Fecha",
+                            time: "Hora",
+                            event: "Evento",
+                            noEventsInRange: "Sin eventos en este rango",
+                            showMore: total => `+ Ver más (${total})`
                         }}
                         eventPropGetter={eventPropGetter}
                     />
                 </div>
             )}
 
+            {/* Modal de Detalle de Permiso (Estilo Google Calendar Popover) */}
+            <Modal isOpen={!!viewEvent} onClose={() => setViewEvent(null)}>
+                {viewEvent && (
+                    <div className="space-y-4">
+                        <div className="flex justify-between items-start">
+                            <h2 className="text-xl font-bold text-gray-800">{viewEvent.tipo_permiso.charAt(0).toUpperCase() + viewEvent.tipo_permiso.slice(1).replace('_', ' ')}</h2>
+                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${viewEvent.estado === 'aprobado' ? 'bg-green-100 text-green-800' :
+                                viewEvent.estado === 'pendiente' ? 'bg-yellow-100 text-yellow-800' :
+                                    'bg-red-100 text-red-800'
+                                }`}>
+                                {viewEvent.estado.toUpperCase()}
+                            </span>
+                        </div>
+
+                        <div className="border-t border-gray-100 pt-3">
+                            <div className="grid grid-cols-1 gap-3 text-sm text-gray-600">
+                                <div className="flex items-center">
+                                    <span className="font-semibold w-24">Empleado:</span>
+                                    <span>{viewEvent.empleado_info.nombres} {viewEvent.empleado_info.apellido_paterno}</span>
+                                </div>
+                                <div className="flex items-center">
+                                    <span className="font-semibold w-24">Fecha:</span>
+                                    <span>{moment(viewEvent.fecha_solicitud).format('LL')}</span>
+                                </div>
+                                <div className="flex items-center">
+                                    <span className="font-semibold w-24">Horario:</span>
+                                    <span>{viewEvent.hora_salida.substring(0, 5)} - {viewEvent.hora_regreso.substring(0, 5)}</span>
+                                </div>
+
+                                {viewEvent.observacion && (
+                                    <div className="mt-2">
+                                        <p className="font-semibold mb-1">Motivo/Observación:</p>
+                                        <p className="bg-gray-50 p-2 rounded text-gray-700">{viewEvent.observacion}</p>
+                                    </div>
+                                )}
+
+                                {viewEvent.comentario_aprobador && (
+                                    <div className="mt-2">
+                                        <p className="font-semibold mb-1">Comentario Aprobador:</p>
+                                        <p className="bg-gray-50 p-2 rounded text-gray-700 italic">"{viewEvent.comentario_aprobador}"</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="flex justify-end gap-2 pt-4 border-t border-gray-100 mt-4">
+                            {isAdminOrHR && viewEvent.estado !== 'aprobado' && (
+                                <button
+                                    onClick={() => handleUpdateStatus(viewEvent.id, 'aprobado')}
+                                    className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 font-medium text-sm shadow-sm"
+                                >
+                                    Aprobar
+                                </button>
+                            )}
+                            {isAdminOrHR && viewEvent.estado !== 'rechazado' && viewEvent.estado !== 'anulado' && (
+                                <button
+                                    onClick={() => handleUpdateStatus(viewEvent.id, 'anulado')}
+                                    className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 font-medium text-sm shadow-sm"
+                                >
+                                    Anular
+                                </button>
+                            )}
+                            {isAdminOrHR && viewEvent.estado !== 'pendiente' && (
+                                <button
+                                    onClick={() => handleUpdateStatus(viewEvent.id, 'pendiente')}
+                                    className="px-4 py-2 bg-yellow-500 text-white rounded-md hover:bg-yellow-600 font-medium text-sm shadow-sm"
+                                >
+                                    Poner Pendiente
+                                </button>
+                            )}
+                            <button
+                                onClick={() => setViewEvent(null)}
+                                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 font-medium text-sm"
+                            >
+                                Cerrar
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </Modal>
+
             <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
                 <form onSubmit={handleSubmit} className="space-y-6">
                     <h2 className="text-2xl font-bold text-gray-800">Registrar Permiso por Horas</h2>
                     {formErrors.general && <div className="text-red-500 bg-red-100 p-3 rounded-lg mb-4">{formErrors.general}</div>}
-                    
+
                     {isAdminOrHR && (
                         <>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
                                     <label>Jefe de Departamento</label>
-                                <SearchableSelect
-                                options={allJefes.map(j => ({ id: j.id, nombre: `${j.nombres} ${j.apellido_paterno} ${j.apellido_materno || ''}`.trim() }))}
-                                selected={(() => {
-                                    if (!selectedJefe) return null;
-                                    const jefe = allJefes.find(j => j.id === selectedJefe);
-                                    return jefe ? { id: jefe.id, nombre: `${jefe.nombres} ${jefe.apellido_paterno} ${jefe.apellido_materno || ''}`.trim() } : null;
-                                })()}
-                                onChange={option => setSelectedJefe(option?.id || null)}
-                            />
+                                    <SearchableSelect
+                                        options={allJefes.map(j => ({ id: j.id, nombre: `${j.nombres} ${j.apellido_paterno} ${j.apellido_materno || ''}`.trim() }))}
+                                        selected={(() => {
+                                            if (!selectedJefe) return null;
+                                            const jefe = allJefes.find(j => j.id === selectedJefe);
+                                            return jefe ? { id: jefe.id, nombre: `${jefe.nombres} ${jefe.apellido_paterno} ${jefe.apellido_materno || ''}`.trim() } : null;
+                                        })()}
+                                        onChange={option => setSelectedJefe(option?.id || null)}
+                                        disabled={isJefeDepto}
+                                    />
                                 </div>
                                 <div>
                                     <label>Departamento a Cargo</label>
-                                    <SearchableSelect options={filteredDepartamentos.map(d => ({id: d.id, nombre: d.nombre}))} onChange={option => setSelectedDepartamento(option?.id || null)} selected={selectedDepartamento ? {id: selectedDepartamento, nombre: allDepartments.find(d => d.id === selectedDepartamento)?.nombre || ''} : null} disabled={!selectedJefe} />
+                                    <SearchableSelect options={filteredDepartamentos.map(d => ({ id: d.id, nombre: d.nombre }))} onChange={option => setSelectedDepartamento(option?.id || null)} selected={selectedDepartamento ? { id: selectedDepartamento, nombre: allDepartments.find(d => d.id === selectedDepartamento)?.nombre || '' } : null} disabled={!selectedJefe || (isJefeDepto && filteredDepartamentos.length === 1)} />
                                 </div>
                             </div>
                             <div>
                                 <label>Empleado</label>
-                                                            <SearchableSelect
-                                                                options={filteredEmpleados.map(e => ({ id: e.id, nombre: `${e.nombres} ${e.apellido_paterno} ${e.apellido_materno || ''}`.trim() }))}
-                                                                selected={(() => {
-                                                                    if (!formState.empleado) return null;
-                                                                    const empleado = allEmployees.find(e => e.id === formState.empleado);
-                                                                    return empleado ? { id: empleado.id, nombre: `${empleado.nombres} ${empleado.apellido_paterno} ${empleado.apellido_materno || ''}`.trim() } : null;
-                                                                })()}
-                                                                onChange={option => setFormState(p => ({...p, empleado: option?.id || null}))}
-                                                                disabled={!selectedDepartamento}
-                                                            />
+                                <SearchableSelect
+                                    options={filteredEmpleados.map(e => ({ id: e.id, nombre: `${e.nombres} ${e.apellido_paterno} ${e.apellido_materno || ''}`.trim() }))}
+                                    selected={(() => {
+                                        if (!formState.empleado) return null;
+                                        const empleado = allEmployees.find(e => e.id === formState.empleado);
+                                        return empleado ? { id: empleado.id, nombre: `${empleado.nombres} ${empleado.apellido_paterno} ${empleado.apellido_materno || ''}`.trim() } : null;
+                                    })()}
+                                    onChange={option => setFormState(p => ({ ...p, empleado: option?.id || null }))}
+                                    disabled={!selectedDepartamento}
+                                />
                             </div>
                             <div>
                                 <label>Estado</label>
@@ -281,8 +527,8 @@ export const PermisosPage: React.FC = () => {
                             </select>
                         </div>
                     </div>
-                    
-                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label>Hora de Salida</label>
                             <input type="time" name="hora_salida" value={formState.hora_salida} onChange={handleInputChange} className={inputStyles} />

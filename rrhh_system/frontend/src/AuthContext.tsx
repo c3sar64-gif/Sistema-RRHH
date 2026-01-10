@@ -9,6 +9,8 @@ interface User {
   email: string;
   groups: { name: string }[];
   is_superuser: boolean;
+  empleado_id: number | null;
+  empleado_nombre: string | null;
 }
 
 interface AuthContextType {

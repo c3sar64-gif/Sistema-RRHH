@@ -16,7 +16,7 @@ from .serializers import (
     FamiliarSerializer, EstudioSerializer, ContratoSerializer, UserSerializer, UserCreateSerializer,
     JefeSerializer, PermisoSerializer
 )
-from .permissions import IsAdminUser
+from .permissions import IsAdminUser, IsStaffUser
 from .pagination import OptionalPagination
 
 class UserViewSet(viewsets.ModelViewSet):
@@ -27,15 +27,41 @@ class UserViewSet(viewsets.ModelViewSet):
     def partial_update(self, request, *args, **kwargs):
         instance = self.get_object()
         role_name = request.data.get('role')
-        if not role_name:
-            return Response({"error": "El campo 'role' es requerido."}, status=status.HTTP_400_BAD_REQUEST)
-        try:
-            new_group = Group.objects.get(name=role_name)
-        except Group.DoesNotExist:
-            return Response({"error": f"El grupo '{role_name}' no existe."}, status=status.HTTP_400_BAD_REQUEST)
         with transaction.atomic():
-            instance.groups.clear()
-            instance.groups.add(new_group)
+            # Update Role
+            if role_name:
+                try:
+                    new_group = Group.objects.get(name=role_name)
+                    instance.groups.clear()
+                    instance.groups.add(new_group)
+                except Group.DoesNotExist:
+                    return Response({"error": f"El grupo '{role_name}' no existe."}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Update Employee Link
+            if 'empleado_id' in request.data:
+                empleado_id = request.data.get('empleado_id')
+                
+                # Desvincular empleado actual si existe
+                if hasattr(instance, 'empleado') and instance.empleado:
+                    old_empleado = instance.empleado
+                    old_empleado.user = None
+                    old_empleado.save()
+                
+                # Vincular nuevo empleado si se proporciona un ID válido
+                if empleado_id: 
+                    try:
+                        empleado = Empleado.objects.get(id=empleado_id)
+                        empleado.user = instance
+                        empleado.save()
+                    except Empleado.DoesNotExist:
+                        return Response({"error": "El empleado seleccionado no existe."}, status=status.HTTP_400_BAD_REQUEST)
+                    except Exception as e:
+                         # Catch potential IntegrityError if employee already has a user? O2O is unique?
+                         # Empleado.user is OneToOneField. So one employee can have only one user.
+                         # If we try to assign this user to an employee who already has a DIFFERENT user, what happens?
+                         # But we are assigning a user TO an employee.
+                         return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
 
@@ -47,14 +73,14 @@ class UserCreate(generics.CreateAPIView):
 class JefesDepartamentoListView(generics.ListAPIView):
     queryset = Empleado.objects.filter(departamentos_liderados__isnull=False).distinct().order_by('nombres', 'apellido_paterno', 'apellido_materno')
     serializer_class = JefeSerializer
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsStaffUser]
     pagination_class = None
 
 class EmpleadoViewSet(viewsets.ModelViewSet):
     queryset = Empleado.objects.all().order_by('nombres', 'apellido_paterno', 'apellido_materno')
     serializer_class = EmpleadoSerializer
     parser_classes = (MultiPartParser, FormParser)
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsStaffUser]
     pagination_class = OptionalPagination
     filter_backends = [filters.SearchFilter]
     search_fields = ['nombres', 'apellido_paterno', 'apellido_materno', 'ci']
@@ -90,7 +116,7 @@ class EmpleadoViewSet(viewsets.ModelViewSet):
 class DepartamentoViewSet(viewsets.ModelViewSet):
     queryset = Departamento.objects.all().order_by('nombre')
     serializer_class = DepartamentoSerializer
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsStaffUser]
     pagination_class = OptionalPagination
     filter_backends = [filters.SearchFilter]
     search_fields = ['nombre']
@@ -98,7 +124,7 @@ class DepartamentoViewSet(viewsets.ModelViewSet):
 class CargoViewSet(viewsets.ModelViewSet):
     queryset = Cargo.objects.all().order_by('nombre')
     serializer_class = CargoSerializer
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsStaffUser]
     pagination_class = OptionalPagination
     filter_backends = [filters.SearchFilter]
     search_fields = ['nombre']
@@ -122,38 +148,35 @@ class PermisoViewSet(viewsets.ModelViewSet):
     queryset = Permiso.objects.all()
     serializer_class = PermisoSerializer
     permission_classes = [IsAuthenticated]
+    pagination_class = OptionalPagination
 
     def get_queryset(self):
         user = self.request.user
+        
+        # Admin and RRHH groups can see all requests
+        if user.is_superuser or user.groups.filter(name__in=['Admin', 'RRHH']).exists():
+            return Permiso.objects.all().order_by('-fecha_solicitud')
+
         if not hasattr(user, 'empleado'):
             return Permiso.objects.none()
 
         empleado = user.empleado
         
-        # Admin and RRHH groups can see all requests
-        if user.is_superuser or user.groups.filter(name__in=['Admin', 'RRHH']).exists():
-            return Permiso.objects.all().order_by('-fecha_solicitud')
-        
-        queryset = Permiso.objects.none()
+        # Base condition: Users see their own requests and requests they assume as approver
+        q_filter = models.Q(empleado=empleado) | models.Q(aprobador_asignado=empleado)
 
-        # Encargado can see all requests from their department
-        if user.groups.filter(name='Encargado').exists():
-            if empleado.departamento:
-                queryset = queryset.union(Permiso.objects.filter(empleado__departamento=empleado.departamento))
+        # Encargado/Jefe logic: Can see requests from departments they lead
+        deptos_liderados = empleado.departamentos_liderados.all()
+        if deptos_liderados.exists():
+             q_filter |= models.Q(empleado__departamento__in=deptos_liderados)
 
-        # All non-admin/hr users (including Encargados) can see their own requests 
-        # and requests they need to approve.
-        queryset = queryset.union(Permiso.objects.filter(
-            models.Q(empleado=empleado) | models.Q(aprobador_asignado=empleado)
-        ))
-        
-        return queryset.distinct().order_by('-fecha_solicitud')
+        return Permiso.objects.filter(q_filter).distinct().order_by('-fecha_solicitud')
 
     def perform_create(self, serializer):
         user = self.request.user
         
         # Admin/HR can create for other employees specified in the request
-        if user.is_superuser or user.groups.filter(name__in=['Admin', 'RRHH', 'Encargado']).exists():
+        if user.is_superuser or user.groups.filter(name__in=['Admin', 'RRHH', 'Encargado', 'Jefe de Departamento']).exists():
             empleado_id = self.request.data.get('empleado')
             if not empleado_id:
                 from rest_framework.exceptions import ValidationError

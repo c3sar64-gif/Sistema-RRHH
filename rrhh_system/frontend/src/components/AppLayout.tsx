@@ -20,7 +20,7 @@ export const AppLayout: React.FC = () => {
   const isRRHH = user?.groups.some(g => g.name === 'RRHH');
   const isEncargado = user?.groups.some(g => g.name === 'Encargado');
 
-  const canManageCore = isAdmin || isRRHH || isEncargado;
+  const canManageCore = isAdmin || isRRHH;
 
   return (
     <div className="flex h-screen bg-gray-200 font-sans">
@@ -51,7 +51,7 @@ export const AppLayout: React.FC = () => {
               <ClockIcon />
               <span className="mx-4">Permisos</span>
             </NavLink>
-            
+
             {/* Admin-only Link */}
             {isAdmin && (
               <>

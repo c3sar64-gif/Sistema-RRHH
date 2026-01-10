@@ -89,9 +89,12 @@ export const DepartmentPage: React.FC = () => {
         setDepartments([]);
         setTotalPages(1);
       }
-      
+
       if (empleadosRes.data && Array.isArray(empleadosRes.data)) {
-        const jefesData = empleadosRes.data.map((e: any) => ({...e, nombre: `${e.nombres} ${e.apellido_paterno}`}));
+        const jefesData = empleadosRes.data.map((e: any) => ({
+          ...e,
+          nombre: `${e.nombres} ${e.apellido_paterno} ${e.apellido_materno || ''}`.trim()
+        }));
         setJefes(jefesData);
       } else {
         setJefes([]);
@@ -126,11 +129,11 @@ export const DepartmentPage: React.FC = () => {
     const url = editingDepartment
       ? `http://127.0.0.1:8000/api/departamentos/${editingDepartment.id}/`
       : 'http://127.0.0.1:8000/api/departamentos/';
-    
+
     const method = editingDepartment ? 'put' : 'post';
     const data = {
-        nombre: departmentName,
-        jefe_departamento: jefeId
+      nombre: departmentName,
+      jefe_departamento: jefeId
     };
 
     try {
@@ -182,76 +185,76 @@ export const DepartmentPage: React.FC = () => {
 
       <div className="bg-white p-6 rounded-lg shadow-md">
         <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                    <tr>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre del Departamento</th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Jefe de Departamento</th>
-                        <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
-                    </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                    {departments.map((dept) => (
-                        <tr key={dept.id}>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{dept.nombre}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{dept.jefe_departamento_info ? `${dept.jefe_departamento_info.nombres} ${dept.jefe_departamento_info.apellido_paterno} ${dept.jefe_departamento_info.apellido_materno || ''}`.trim() : 'N/A'}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-right">
-                                <button onClick={() => openModal(dept)} className="text-indigo-600 hover:text-indigo-900 mr-4">Editar</button>
-                                <button onClick={() => handleDelete(dept.id)} className="text-red-600 hover:text-red-900">Eliminar</button>
-                            </td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre del Departamento</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Jefe de Departamento</th>
+                <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {departments.map((dept) => (
+                <tr key={dept.id}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{dept.nombre}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{dept.jefe_departamento_info ? `${dept.jefe_departamento_info.nombres} ${dept.jefe_departamento_info.apellido_paterno} ${dept.jefe_departamento_info.apellido_materno || ''}`.trim() : 'N/A'}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-right">
+                    <button onClick={() => openModal(dept)} className="text-indigo-600 hover:text-indigo-900 mr-4">Editar</button>
+                    <button onClick={() => handleDelete(dept.id)} className="text-red-600 hover:text-red-900">Eliminar</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
         <div className="mt-4 flex justify-between items-center">
-            <button 
-                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} 
-                disabled={currentPage === 1}
-                className="px-4 py-2 bg-gray-300 text-gray-800 rounded-md disabled:opacity-50 hover:shadow-md"
-            >
-                Anterior
-            </button>
-            <span>
-                Página {currentPage} de {totalPages}
-            </span>
-            <button 
-                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} 
-                disabled={currentPage === totalPages}
-                className="px-4 py-2 bg-gray-300 text-gray-800 rounded-md disabled:opacity-50 hover:shadow-md"
-            >
-                Siguiente
-            </button>
+          <button
+            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+            disabled={currentPage === 1}
+            className="px-4 py-2 bg-gray-300 text-gray-800 rounded-md disabled:opacity-50 hover:shadow-md"
+          >
+            Anterior
+          </button>
+          <span>
+            Página {currentPage} de {totalPages}
+          </span>
+          <button
+            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+            disabled={currentPage === totalPages}
+            className="px-4 py-2 bg-gray-300 text-gray-800 rounded-md disabled:opacity-50 hover:shadow-md"
+          >
+            Siguiente
+          </button>
         </div>
       </div>
 
       <Modal isOpen={isModalOpen} onClose={closeModal}>
         <div>
-            <h2 className="text-2xl font-bold mb-6">{editingDepartment ? 'Editar Departamento' : 'Crear Nuevo Departamento'}</h2>
-            {error && <div className="text-red-500 bg-red-100 p-3 rounded-lg mb-4">{error}</div>}
-            <div className="space-y-4">
-                <div>
-                    <label className="block text-sm font-medium text-gray-700">Nombre del Departamento</label>
-                    <input 
-                      type="text" 
-                      value={departmentName} 
-                      onChange={(e) => setDepartmentName(e.target.value)} 
-                      className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2.5" 
-                    />
-                </div>
-                <div>
-                    <SearchableSelect
-                        label="Jefe de Departamento"
-                        options={jefes}
-                        selected={jefes.find(j => j.id === jefeId) || null}
-                        onChange={(option) => setJefeId(option ? option.id : null)}
-                    />
-                </div>
+          <h2 className="text-2xl font-bold mb-6">{editingDepartment ? 'Editar Departamento' : 'Crear Nuevo Departamento'}</h2>
+          {error && <div className="text-red-500 bg-red-100 p-3 rounded-lg mb-4">{error}</div>}
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Nombre del Departamento</label>
+              <input
+                type="text"
+                value={departmentName}
+                onChange={(e) => setDepartmentName(e.target.value)}
+                className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2.5"
+              />
             </div>
-            <div className="flex justify-end mt-8">
-                <button onClick={closeModal} className="mr-3 px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 font-semibold">Cancelar</button>
-                <button onClick={handleSubmit} className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 font-semibold">Guardar</button>
+            <div>
+              <SearchableSelect
+                label="Jefe de Departamento"
+                options={jefes}
+                selected={jefes.find(j => j.id === jefeId) || null}
+                onChange={(option) => setJefeId(option ? option.id : null)}
+              />
             </div>
+          </div>
+          <div className="flex justify-end mt-8">
+            <button onClick={closeModal} className="mr-3 px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 font-semibold">Cancelar</button>
+            <button onClick={handleSubmit} className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 font-semibold">Guardar</button>
+          </div>
         </div>
       </Modal>
     </div>

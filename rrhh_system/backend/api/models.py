@@ -144,7 +144,7 @@ ESTADO_PERMISO_CHOICES = [
 class Permiso(models.Model):
     empleado = models.ForeignKey(Empleado, on_delete=models.CASCADE, related_name='permisos')
     aprobador_asignado = models.ForeignKey(Empleado, on_delete=models.SET_NULL, null=True, blank=True, related_name='permisos_a_aprobar')
-    fecha_solicitud = models.DateField(auto_now_add=True)
+    fecha_solicitud = models.DateField()
     tipo_permiso = models.CharField(max_length=20, choices=TIPO_PERMISO_CHOICES)
     observacion = models.TextField(blank=True, null=True)
     hora_salida = models.TimeField()

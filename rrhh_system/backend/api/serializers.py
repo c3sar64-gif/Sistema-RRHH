@@ -15,10 +15,21 @@ class UserSerializer(serializers.ModelSerializer):
     Serializer for displaying user details.
     """
     groups = GroupSerializer(many=True, read_only=True)
+    empleado_id = serializers.SerializerMethodField()
+    empleado_nombre = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ('id', 'username', 'email', 'groups', 'is_superuser')
+        fields = ('id', 'username', 'email', 'groups', 'is_superuser', 'empleado_id', 'empleado_nombre')
+
+    def get_empleado_id(self, obj):
+        return obj.empleado.id if hasattr(obj, 'empleado') else None
+
+    def get_empleado_nombre(self, obj):
+        if hasattr(obj, 'empleado'):
+            materno = f" {obj.empleado.apellido_materno}" if obj.empleado.apellido_materno else ""
+            return f"{obj.empleado.nombres} {obj.empleado.apellido_paterno}{materno}"
+        return None
 
 class UserCreateSerializer(serializers.ModelSerializer):
     """
@@ -26,7 +37,7 @@ class UserCreateSerializer(serializers.ModelSerializer):
     """
     email = serializers.EmailField(required=True)
     # The role is now optional and defaults to 'Empleado' if not provided.
-    role = serializers.ChoiceField(choices=['Admin', 'RRHH', 'Encargado', 'Empleado'], write_only=True, required=False)
+    role = serializers.ChoiceField(choices=['Admin', 'RRHH', 'Encargado', 'Empleado', 'Jefe de Departamento'], write_only=True, required=False)
     password = serializers.CharField(write_only=True)
 
     class Meta:
@@ -99,7 +110,7 @@ class EmpleadoSerializer(serializers.ModelSerializer):
     class Meta:
         model = Empleado
         fields = [
-            'id', 'nombres', 'apellido_paterno', 'apellido_materno', 'ci',
+            'id', 'user', 'nombres', 'apellido_paterno', 'apellido_materno', 'ci',
             'fecha_nacimiento', 'sexo', 'estado_civil', 'celular', 'email',
             'provincia', 'direccion', 'tipo_vivienda', 'nacionalidad',
             'nombre_conyuge', 'tiene_hijos', 'fecha_ingreso_inicial',
@@ -255,11 +266,9 @@ class PermisoSerializer(serializers.ModelSerializer):
         model = Permiso
         fields = '__all__'
         read_only_fields = [
-            'empleado',
             'empleado_info',
             'aprobador_asignado',
             'aprobador_asignado_info',
-            'fecha_solicitud',
             'fecha_aprobacion',
             'comentario_aprobador',
         ]
