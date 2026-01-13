@@ -59,6 +59,9 @@ class Empleado(models.Model):
 
     # HR Information
     fecha_ingreso_inicial = models.DateField()
+    fecha_ingreso_vigente = models.DateField(null=True, blank=True, help_text="Fecha de ingreso del contrato vigente")
+    feature_vacaciones = models.BooleanField(default=True)
+    # vacaciones_guardadas removed in favor of separate model
     cargo = models.ForeignKey(Cargo, on_delete=models.SET_NULL, null=True, blank=True)
     departamento = models.ForeignKey(Departamento, on_delete=models.SET_NULL, null=True, blank=True) # Sector is Departamento
     jefe = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='subordinados')
@@ -178,3 +181,63 @@ class HoraExtra(models.Model):
 
     def __str__(self):
         return f'Hora Extra {self.get_tipo_hora_extra_display()} para {self.empleado} - {self.fecha_solicitud}'
+
+# --- Vacaciones Models ---
+
+class VacacionPeriodo(models.Model):
+    empleado = models.ForeignKey(Empleado, on_delete=models.CASCADE, related_name='periodos_vacacion')
+    fecha_inicio = models.DateField(help_text="Fecha de inicio del contrato o ciclo")
+    fecha_fin = models.DateField(null=True, blank=True, help_text="Fecha fin del contrato o renovación")
+    activo = models.BooleanField(default=True)
+
+    def __str__(self):
+        return f"Periodo {self.fecha_inicio} - {self.empleado}"
+
+class SolicitudVacacion(models.Model):
+    ESTADO_CHOICES = [
+        ('aprobado', 'Aprobado'),
+        ('anulado', 'Anulado'), 
+    ]
+    
+    empleado = models.ForeignKey(Empleado, on_delete=models.CASCADE, related_name='solicitudes_vacacion')
+    aprobador = models.ForeignKey(Empleado, on_delete=models.SET_NULL, null=True, blank=True, related_name='vacaciones_a_aprobar')
+    fecha_solicitud = models.DateField(auto_now_add=True)
+    fecha_inicio = models.DateField()
+    fecha_fin = models.DateField()
+    es_medio_dia = models.BooleanField(default=False, help_text="Si es True, cuenta como 0.5 días")
+    dias_calculados = models.DecimalField(max_digits=5, decimal_places=1, help_text="Días a descontar del saldo")
+    estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default='aprobado')
+    observacion = models.TextField(blank=True, null=True)
+    comentario_aprobador = models.TextField(blank=True, null=True)
+    fecha_aprobacion = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f"Vacación {self.dias_calculados} días - {self.empleado}"
+
+class VacacionMovimiento(models.Model):
+    TIPO_CHOICES = [
+        ('inicio_contrato', 'Inicio/Renovación Contrato'),
+        ('acumulacion_anual', 'Acumulación Anual'),
+        ('consumo', 'Consumo (Solicitud)'),
+        ('pago', 'Pago en Efectivo'),
+        ('ajuste', 'Ajuste Manual'),
+        ('traspaso', 'Traspaso de Saldo'),
+    ]
+
+    empleado = models.ForeignKey(Empleado, on_delete=models.CASCADE, related_name='movimientos_vacacion')
+    periodo = models.ForeignKey(VacacionPeriodo, on_delete=models.CASCADE, related_name='movimientos')
+    fecha = models.DateField(auto_now_add=True)
+    tipo = models.CharField(max_length=50, choices=TIPO_CHOICES)
+    dias = models.DecimalField(max_digits=6, decimal_places=2, help_text="Valor positivo aumenta saldo, negativo resta")
+    solicitud = models.ForeignKey(SolicitudVacacion, on_delete=models.SET_NULL, null=True, blank=True, related_name='movimientos')
+    detalle = models.CharField(max_length=255, blank=True, null=True)
+class VacacionGuardada(models.Model):
+    empleado = models.ForeignKey(Empleado, on_delete=models.CASCADE, related_name='vacaciones_guardadas_list')
+    dias = models.DecimalField(max_digits=5, decimal_places=1)
+    gestion = models.CharField(max_length=50, blank=True, null=True, help_text="Gestión o motivo (ej. 2022-2023)")
+    fecha_creacion = models.DateField(auto_now_add=True)
+    
+    def __str__(self):
+        return f"{self.empleado} - {self.dias} días ({self.gestion})"
+    def __str__(self):
+        return f"{self.tipo} ({self.dias}) - {self.empleado}"

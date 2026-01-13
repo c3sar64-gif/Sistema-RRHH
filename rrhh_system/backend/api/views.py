@@ -9,12 +9,14 @@ from django.utils import timezone
 import json
 
 from .models import (
-    Empleado, Departamento, Cargo, Familiar, Estudio, Contrato, Permiso, HoraExtra
+    Empleado, Departamento, Cargo, Familiar, Estudio, Contrato, Permiso, HoraExtra,
+    VacacionPeriodo, SolicitudVacacion, VacacionMovimiento, VacacionGuardada
 )
 from .serializers import (
     EmpleadoSerializer, DepartamentoSerializer, CargoSerializer,
     FamiliarSerializer, EstudioSerializer, ContratoSerializer, UserSerializer, UserCreateSerializer,
-    JefeSerializer, PermisoSerializer, HoraExtraSerializer
+    JefeSerializer, PermisoSerializer, HoraExtraSerializer,
+    VacacionPeriodoSerializer, SolicitudVacacionSerializer, VacacionMovimientoSerializer, VacacionGuardadaSerializer
 )
 from .permissions import IsAdminUser, IsStaffUser
 from .pagination import OptionalPagination
@@ -84,6 +86,17 @@ class EmpleadoViewSet(viewsets.ModelViewSet):
     pagination_class = OptionalPagination
     filter_backends = [filters.SearchFilter]
     search_fields = ['nombres', 'apellido_paterno', 'apellido_materno', 'ci']
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        # Filter for "Vacaciones Guardadas"
+        has_guardadas = self.request.query_params.get('has_vacaciones_guardadas')
+        if has_guardadas == 'true':
+            qs = qs.filter(vacaciones_guardadas__gt=0)
+        
+        # Existing pagination flag handling is done in OptionalPagination but we might need to be careful
+        # returning qs is standard.
+        return qs
 
     def _prepare_data_from_request(self, request):
         data = request.POST.copy()
@@ -332,3 +345,315 @@ class HoraExtraViewSet(viewsets.ModelViewSet):
         solicitud.comentario_aprobador = request.data.get('comentario', 'Rechazado')
         solicitud.save()
         return Response(self.get_serializer(solicitud).data)
+
+# --- Vacaciones ViewSets ---
+
+class VacacionPeriodoViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = VacacionPeriodo.objects.all()
+    serializer_class = VacacionPeriodoSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        user = self.request.user
+        if not hasattr(user, 'empleado'):
+             if user.is_superuser or user.groups.filter(name__in=['Admin', 'RRHH']).exists():
+                 return VacacionPeriodo.objects.all()
+             return VacacionPeriodo.objects.none()
+        
+        # Admins see all, employees see theirs
+        if user.is_superuser or user.groups.filter(name__in=['Admin', 'RRHH']).exists():
+            return VacacionPeriodo.objects.all().order_by('-fecha_inicio')
+        
+        # Admins see all, employees see theirs
+        if user.is_superuser or user.groups.filter(name__in=['Admin', 'RRHH']).exists():
+            return VacacionPeriodo.objects.all().order_by('-fecha_inicio')
+        
+        return VacacionPeriodo.objects.filter(empleado=user.empleado).order_by('-fecha_inicio')
+
+    @action(detail=False, methods=['get'])
+    def saldo(self, request):
+        empleado_id = request.query_params.get('empleado_id')
+        user = request.user
+        
+        # Determine target employee
+        if empleado_id:
+            # Check permissions to view other's balance
+            if not (user.is_superuser or user.groups.filter(name__in=['Admin', 'RRHH', 'Jefe de Departamento']).exists()):
+                 return Response({'error': 'No tienes permiso para ver el saldo de otro empleado.'}, status=status.HTTP_403_FORBIDDEN)
+            try:
+                empleado = Empleado.objects.get(pk=empleado_id)
+            except Empleado.DoesNotExist:
+                 return Response({'error': 'Empleado no encontrado.'}, status=status.HTTP_404_NOT_FOUND)
+        else:
+            if not hasattr(user, 'empleado'):
+                return Response({'saldo': 0.0})
+            empleado = user.empleado
+
+        # Use ONLY fecha_ingreso_vigente for calculation as requested
+        effective_hire_date = empleado.fecha_ingreso_vigente
+        
+        # Calculate longevity (Antigüedad) detailed: Years, Months, Days
+        antiguedad_detallada = ""
+        if effective_hire_date:
+            from datetime import date
+            from dateutil.relativedelta import relativedelta
+            
+            hire_date = effective_hire_date
+            today = date.today()
+            diff = relativedelta(today, hire_date)
+            
+            parts = []
+            if diff.years > 0:
+                parts.append(f"{diff.years} {'año' if diff.years == 1 else 'años'}")
+            if diff.months > 0:
+                parts.append(f"{diff.months} {'mes' if diff.months == 1 else 'meses'}")
+            if diff.days > 0:
+                parts.append(f"{diff.days} {'día' if diff.days == 1 else 'días'}")
+            
+            antiguedad_detallada = ", ".join(parts) if parts else "0 días"
+            
+            # Excel formula logic: =(SI(H6<5;H6;5)*15)+(SI(H6>10;5;SI((H6-5)>0;H6-5;0)))*20+(SI(H6>10;H6-10;0)*30)
+            years = diff.years
+            part1 = min(years, 5) * 15
+            
+            if years > 10:
+                part2 = 5 * 20
+            elif (years - 5) > 0:
+                part2 = (years - 5) * 20
+            else:
+                part2 = 0
+                
+            part3 = max(years - 10, 0) * 30
+            vacacion_cumplida = part1 + part2 + part3
+        else:
+            vacacion_cumplida = 0
+
+        # Find active period (still useful for period_id and period_inicio)
+        periodo = VacacionPeriodo.objects.filter(empleado=empleado, activo=True).last()
+        
+        # Calculate saved days from new table
+        guardadas_total = VacacionGuardada.objects.filter(empleado=empleado).aggregate(total=models.Sum('dias'))['total'] or 0.0
+        
+        # Calculate consumption (LTD Debits)
+        # Sum all movements that are NOT the standard accumulation types ('inicio_contrato', 'acumulacion_anual')
+        # This includes 'consumo' (negative), 'pago' (negative), 'ajuste' (any), 'traspaso' (any)
+        consumo_total = VacacionMovimiento.objects.filter(
+            empleado=empleado
+        ).exclude(
+            tipo__in=['inicio_contrato', 'acumulacion_anual']
+        ).aggregate(total=models.Sum('dias'))['total'] or 0.0
+        
+        # Redefined Saldo Actual = (LTD Earned) + (LTD Guarded) + (LTD Movements/Consumptions)
+        saldo_total = float(vacacion_cumplida) + float(guardadas_total) + float(consumo_total)
+
+        if not periodo:
+            return Response({
+                'saldo': saldo_total,
+                'saldo_periodo': float(consumo_total),
+                'saldo_guardadas': float(guardadas_total),
+                'periodo': None,
+                'periodo_inicio': effective_hire_date,
+                'fecha_ingreso_vigente': effective_hire_date,
+                'anios_trabajados': antiguedad_detallada,
+                'vacacion_cumplida': vacacion_cumplida
+            })
+            
+        fecha_inicio_show = empleado.fecha_ingreso_vigente if empleado.fecha_ingreso_vigente else periodo.fecha_inicio
+
+        return Response({
+            'saldo': saldo_total,
+            'saldo_periodo': float(consumo_total),
+            'saldo_guardadas': float(guardadas_total),
+            'periodo_id': periodo.id,
+            'periodo_inicio': fecha_inicio_show,
+            'fecha_ingreso_vigente': effective_hire_date,
+            'anios_trabajados': antiguedad_detallada,
+            'vacacion_cumplida': vacacion_cumplida
+        })
+
+class VacacionGuardadaViewSet(viewsets.ModelViewSet):
+    queryset = VacacionGuardada.objects.all().order_by('-fecha_creacion')
+    serializer_class = VacacionGuardadaSerializer
+    permission_classes = [IsAdminUser] # Restricted to admin/RRHH
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['empleado__nombres', 'empleado__apellido_paterno']
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        empleado_id = self.request.query_params.get('empleado_id')
+        if empleado_id:
+            qs = qs.filter(empleado_id=empleado_id)
+        return qs
+
+class VacacionMovimientoViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = VacacionMovimiento.objects.all()
+    serializer_class = VacacionMovimientoSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        qs = VacacionMovimiento.objects.all().order_by('-fecha')
+        
+        empleado_id = self.request.query_params.get('empleado')
+        if empleado_id:
+            qs = qs.filter(empleado_id=empleado_id)
+        
+        if not hasattr(user, 'empleado'):
+             if user.is_superuser or user.groups.filter(name__in=['Admin', 'RRHH']).exists():
+                 return qs
+             return VacacionMovimiento.objects.none()
+             
+        if not (user.is_superuser or user.groups.filter(name__in=['Admin', 'RRHH']).exists()):
+            qs = qs.filter(empleado=user.empleado)
+            
+        return qs
+
+class SolicitudVacacionViewSet(viewsets.ModelViewSet):
+    queryset = SolicitudVacacion.objects.all()
+    serializer_class = SolicitudVacacionSerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class = OptionalPagination
+
+    def get_queryset(self):
+        user = self.request.user
+        
+        if user.is_superuser or user.groups.filter(name__in=['Admin', 'RRHH']).exists():
+            return SolicitudVacacion.objects.all().order_by('-fecha_solicitud')
+
+        if not hasattr(user, 'empleado'):
+            return SolicitudVacacion.objects.none()
+
+        empleado = user.empleado
+        
+        # See own requests and requests to approve
+        q_filter = models.Q(empleado=empleado) | models.Q(aprobador=empleado)
+        
+        # See department requests if Jefe
+        deptos_liderados = empleado.departamentos_liderados.all()
+        if deptos_liderados.exists():
+             q_filter |= models.Q(empleado__departamento__in=deptos_liderados)
+             
+        return SolicitudVacacion.objects.filter(q_filter).distinct().order_by('-fecha_solicitud')
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        data = self.request.data
+
+        # 1. Identify Empleado
+        if user.is_superuser or user.groups.filter(name__in=['Admin', 'RRHH', 'Jefe de Departamento']).exists():
+            empleado_id = data.get('empleado')
+            if not empleado_id:
+                from rest_framework.exceptions import ValidationError
+                raise ValidationError({"empleado": "Debes seleccionar un empleado."})
+            empleado = Empleado.objects.get(pk=empleado_id)
+        else:
+            if not hasattr(user, 'empleado'):
+                from rest_framework.exceptions import PermissionDenied
+                raise PermissionDenied("No tienes un perfil de empleado.")
+            empleado = user.empleado
+            
+        aprobador = empleado.jefe
+        
+        # 2. Logic to calculate days
+        from datetime import datetime, timedelta
+        import math
+        
+        fecha_inicio_str = data.get('fecha_inicio')
+        fecha_fin_str = data.get('fecha_fin')
+        es_medio_dia = data.get('es_medio_dia', False)
+
+        if not fecha_inicio_str or not fecha_fin_str:
+             from rest_framework.exceptions import ValidationError
+             raise ValidationError("Fechas requeridas.")
+        
+        start = datetime.strptime(fecha_inicio_str, '%Y-%m-%d').date()
+        end = datetime.strptime(fecha_fin_str, '%Y-%m-%d').date()
+        
+        if end < start:
+             from rest_framework.exceptions import ValidationError
+             raise ValidationError("Fecha fin no puede ser anterior a fecha inicio.")
+
+        # Day Calculation
+        dias_calculados = 0.0
+        
+        if es_medio_dia:
+            # If "Medio Día" is checked, forced to 0.5 regardless of range (usually range should be 1 day)
+            if start != end:
+                 from rest_framework.exceptions import ValidationError
+                 raise ValidationError("Para 'Media Jornada', la fecha inicio y fin deben ser la misma.")
+            dias_calculados = 0.5
+        else:
+            # Iterate days
+            delta = end - start
+            for i in range(delta.days + 1):
+                day = start + timedelta(days=i)
+                # Monday(0) to Saturday(5) = 1 day (User Rule: Sat counts as 1 day for deduction)
+                # Sunday(6) = 0
+                if day.weekday() <= 5: # 0-5 includes Saturday
+                    dias_calculados += 1.0
+        
+        # 3. Check Balance (Optional strictness, User said balance can go negative?
+        # "El empleado empieza con 5 dias pero va sacando 3 dias y luego otro 3 dias y su saldo seria -1"
+        # So we allow negative.
+        
+        # 4. Find Active Period
+        periodo_activo = VacacionPeriodo.objects.filter(empleado=empleado, activo=True).last()
+        if not periodo_activo:
+            # Auto-create period if missing (Safety net)
+            # Assuming start from employee entry date or today
+            periodo_activo = VacacionPeriodo.objects.create(
+                empleado=empleado,
+                fecha_inicio=empleado.fecha_ingreso_inicial, # or contract start
+                fecha_fin=None,
+                activo=True
+            )
+            # Create initial movement if it's a fresh period? No, assume 0 balance until accrual logic runs.
+
+        # 5. Save and Create Movement immediately
+        with transaction.atomic():
+            solicitud = serializer.save(
+                empleado=empleado, 
+                aprobador=aprobador,
+                dias_calculados=dias_calculados,
+                estado='aprobado',
+                fecha_aprobacion=timezone.now()
+            )
+            
+            VacacionMovimiento.objects.create(
+                empleado=solicitud.empleado,
+                periodo=periodo_activo,
+                tipo='consumo',
+                dias=-solicitud.dias_calculados,
+                solicitud=solicitud,
+                detalle=f"Vacación aprobada del {solicitud.fecha_inicio} al {solicitud.fecha_fin}"
+            )
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
+    def anular(self, request, pk=None):
+        solicitud = self.get_object()
+        user_empleado = getattr(request.user, 'empleado', None)
+        
+        # Permission check: Admin, RRHH, or the employee themselves
+        can_cancel = False
+        if request.user.is_superuser or request.user.groups.filter(name__in=['Admin', 'RRHH']).exists():
+             can_cancel = True
+        elif solicitud.empleado == user_empleado:
+             can_cancel = True
+             
+        if not can_cancel:
+            return Response({'error': 'No tienes permiso para anular.'}, status=status.HTTP_403_FORBIDDEN)
+
+        if solicitud.estado == 'anulado':
+            return Response({'error': 'La solicitud ya está anulada.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Execute Transaction
+        with transaction.atomic():
+            solicitud.estado = 'anulado'
+            solicitud.save()
+            
+            # Remove associated movements (consumption)
+            solicitud.movimientos.all().delete()
+
+        return Response(self.get_serializer(solicitud).data)
+        
+

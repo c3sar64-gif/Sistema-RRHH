@@ -2,7 +2,8 @@ from rest_framework import serializers
 from django.db import transaction
 from django.contrib.auth.models import User, Group
 from .models import (
-    Empleado, Departamento, Cargo, Familiar, Estudio, Contrato, Permiso, HoraExtra
+    Empleado, Departamento, Cargo, Familiar, Estudio, Contrato, Permiso, HoraExtra,
+    VacacionPeriodo, SolicitudVacacion, VacacionMovimiento, VacacionGuardada
 )
 
 class GroupSerializer(serializers.ModelSerializer):
@@ -113,7 +114,7 @@ class EmpleadoSerializer(serializers.ModelSerializer):
             'id', 'user', 'nombres', 'apellido_paterno', 'apellido_materno', 'ci',
             'fecha_nacimiento', 'sexo', 'estado_civil', 'celular', 'email',
             'provincia', 'direccion', 'tipo_vivienda', 'nacionalidad',
-            'nombre_conyuge', 'tiene_hijos', 'fecha_ingreso_inicial',
+            'nombre_conyuge', 'tiene_hijos', 'fecha_ingreso_inicial', 'fecha_ingreso_vigente',
             'cargo', 'cargo_nombre',
             'departamento', 'departamento_nombre',
             'jefe', 'jefe_info', 'foto',
@@ -291,3 +292,41 @@ class HoraExtraSerializer(serializers.ModelSerializer):
             'fecha_aprobacion',
             'comentario_aprobador',
         ]
+
+class VacacionPeriodoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = VacacionPeriodo
+        fields = '__all__'
+
+class VacacionMovimientoSerializer(serializers.ModelSerializer):
+    solicitud_detalle = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = VacacionMovimiento
+        fields = '__all__'
+    
+    def get_solicitud_detalle(self, obj):
+        if obj.solicitud:
+            return f"{obj.solicitud.fecha_inicio} a {obj.solicitud.fecha_fin}"
+        return None
+
+class SolicitudVacacionSerializer(serializers.ModelSerializer):
+    empleado_info = JefeSerializer(source='empleado', read_only=True)
+    aprobador_info = JefeSerializer(source='aprobador', read_only=True)
+    departamento_nombre = serializers.CharField(source='empleado.departamento.nombre', read_only=True, allow_null=True)
+
+    class Meta:
+        model = SolicitudVacacion
+        fields = '__all__'
+        read_only_fields = ['dias_calculados', 'fecha_solicitud', 'estado', 'fecha_aprobacion', 'comentario_aprobador', 'empleado_info', 'aprobador_info', 'departamento_nombre']
+
+class VacacionGuardadaSerializer(serializers.ModelSerializer):
+    empleado_nombre = serializers.SerializerMethodField()
+    departamento_nombre = serializers.CharField(source='empleado.departamento.nombre', read_only=True)
+
+    class Meta:
+        model = VacacionGuardada
+        fields = '__all__'
+    
+    def get_empleado_nombre(self, obj):
+        return f"{obj.empleado.nombres} {obj.empleado.apellido_paterno} {obj.empleado.apellido_materno or ''}".strip()

@@ -20,6 +20,8 @@ import { EmployeeFormPage } from './pages/EmployeeFormPage';
 import { EmployeeDetailPage } from './pages/EmployeeDetailPage';
 import { PermisosPage } from './pages/PermisosPage';
 import { HorasExtrasPage } from './pages/HorasExtrasPage';
+import VacacionesPage from './pages/VacacionesPage';
+import VacacionesGuardadasPage from './pages/VacacionesGuardadasPage';
 
 // Componente para manejar la ruta raíz
 const Root = () => {
@@ -69,6 +71,8 @@ const App: React.FC = () => {
 
           <Route path="permisos" element={<PermisosPage />} />
           <Route path="horas-extras" element={<HorasExtrasPage />} />
+          <Route path="vacaciones" element={<VacacionesPage />} />
+          <Route path="vacaciones-guardadas" element={<RequireAdminOrHR><VacacionesGuardadasPage /></RequireAdminOrHR>} />
           <Route path="admin-usuarios" element={<UserAdminPage />} />
         </Route>
       </Route>

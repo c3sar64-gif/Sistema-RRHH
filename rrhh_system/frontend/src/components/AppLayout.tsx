@@ -18,7 +18,7 @@ export const AppLayout: React.FC = () => {
 
   const isAdmin = user?.is_superuser || user?.groups.some(g => g.name === 'Admin');
   const isRRHH = user?.groups.some(g => g.name === 'RRHH');
-  const isEncargado = user?.groups.some(g => g.name === 'Encargado');
+  // const isEncargado = user?.groups.some(g => g.name === 'Encargado');
 
   const canManageCore = isAdmin || isRRHH;
 
@@ -58,6 +58,10 @@ export const AppLayout: React.FC = () => {
                 <span className="mx-4">Horas Extras</span>
               </NavLink>
             )}
+            <NavLink to="/vacaciones" className={({ isActive }) => `${navLinkClasses} ${isActive ? activeNavLinkClasses : ''}`}>
+              <ClockIcon />
+              <span className="mx-4">Vacaciones</span>
+            </NavLink>
 
             {/* Admin-only Link */}
             {isAdmin && (
@@ -89,6 +93,6 @@ export const AppLayout: React.FC = () => {
           <Outlet />
         </main>
       </div>
-    </div>
+    </div >
   );
 };
