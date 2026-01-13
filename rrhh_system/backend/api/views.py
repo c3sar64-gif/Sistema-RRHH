@@ -9,12 +9,12 @@ from django.utils import timezone
 import json
 
 from .models import (
-    Empleado, Departamento, Cargo, Familiar, Estudio, Contrato, Permiso
+    Empleado, Departamento, Cargo, Familiar, Estudio, Contrato, Permiso, HoraExtra
 )
 from .serializers import (
     EmpleadoSerializer, DepartamentoSerializer, CargoSerializer,
     FamiliarSerializer, EstudioSerializer, ContratoSerializer, UserSerializer, UserCreateSerializer,
-    JefeSerializer, PermisoSerializer
+    JefeSerializer, PermisoSerializer, HoraExtraSerializer
 )
 from .permissions import IsAdminUser, IsStaffUser
 from .pagination import OptionalPagination
@@ -232,3 +232,103 @@ class PermisoViewSet(viewsets.ModelViewSet):
 def get_current_user(request):
     serializer = UserSerializer(request.user)
     return Response(serializer.data)
+
+class HoraExtraViewSet(viewsets.ModelViewSet):
+    queryset = HoraExtra.objects.all()
+    serializer_class = HoraExtraSerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class = OptionalPagination
+
+    def get_queryset(self):
+        user = self.request.user
+        
+        # Admin, RRHH can see all requests
+        if user.is_superuser or user.groups.filter(name__in=['Admin', 'RRHH']).exists():
+            return HoraExtra.objects.all().order_by('-fecha_solicitud')
+
+        if not hasattr(user, 'empleado'):
+            return HoraExtra.objects.none()
+
+        empleado = user.empleado
+        
+        # Check if user is one of the specific authorized Jefes
+        materno = f" {empleado.apellido_materno}" if empleado.apellido_materno else ""
+        nombre_completo = f"{empleado.nombres} {empleado.apellido_paterno}{materno}".strip()
+        
+        authorized_names = ['Alcira Fuentes Marcusi', 'Esteban Martinez Manuel']
+        
+        if nombre_completo in authorized_names:
+             # Authorized Jefes can see requests from departments they lead
+            deptos_liderados = empleado.departamentos_liderados.all()
+            if deptos_liderados.exists():
+                 q_filter = models.Q(empleado=empleado) | models.Q(aprobador_asignado=empleado) | models.Q(empleado__departamento__in=deptos_liderados)
+                 return HoraExtra.objects.filter(q_filter).distinct().order_by('-fecha_solicitud')
+        
+        # Regular employees (or non-authorized Jefes) ONLY see their own requests
+        # NOTE: User specified "Visible for...", implying strict access control.
+        # But if a regular employee logs in, they might expect to see THEIR OWN requests?
+        # The prompt says "Horas Extras solo tiene que ser visible para...".
+        # This likely means the MODULE itself. 
+        # For the API, it's safer to allow employees to see their own records if they somehow navigate there, 
+        # or if the "Registrar" button is available elsewhere.
+        # However, to be strict with "Visibility", I'll default to only own records for everyone else,
+        # but effectively the Frontend hides the entry point.
+        
+        q_filter = models.Q(empleado=empleado) | models.Q(aprobador_asignado=empleado)
+        return HoraExtra.objects.filter(q_filter).distinct().order_by('-fecha_solicitud')
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        
+        # Admin/HR can create for other employees specified in the request
+        if user.is_superuser or user.groups.filter(name__in=['Admin', 'RRHH', 'Encargado', 'Jefe de Departamento']).exists():
+            empleado_id = self.request.data.get('empleado')
+            if not empleado_id:
+                from rest_framework.exceptions import ValidationError
+                raise ValidationError({"empleado": "Debes seleccionar un empleado."})
+            try:
+                empleado = Empleado.objects.get(pk=empleado_id)
+            except Empleado.DoesNotExist:
+                from rest_framework.exceptions import ValidationError
+                raise ValidationError({"empleado": "El empleado seleccionado no existe."})
+        else: # Regular employee requests for themselves
+            if not hasattr(user, 'empleado'):
+                from rest_framework.exceptions import PermissionDenied
+                raise PermissionDenied("No tienes un perfil de empleado para crear solicitudes.")
+            empleado = user.empleado
+
+        aprobador = empleado.jefe
+        # For now, require approver same as Permiso
+        if not aprobador:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError(f"El empleado '{empleado}' no tiene un jefe inmediato asignado para aprobar la solicitud.")
+            
+        serializer.save(empleado=empleado, aprobador_asignado=aprobador)
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
+    def approve(self, request, pk=None):
+        solicitud = self.get_object()
+        user_empleado = request.user.empleado
+        if solicitud.aprobador_asignado != user_empleado:
+            return Response({'error': 'No tienes permiso para aprobar esta solicitud.'}, status=status.HTTP_403_FORBIDDEN)
+        if solicitud.estado != 'pendiente':
+            return Response({'error': 'Solo se pueden aprobar solicitudes pendientes.'}, status=status.HTTP_400_BAD_REQUEST)
+        solicitud.estado = 'aprobado'
+        solicitud.fecha_aprobacion = timezone.now()
+        solicitud.comentario_aprobador = request.data.get('comentario', 'Aprobado')
+        solicitud.save()
+        return Response(self.get_serializer(solicitud).data)
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
+    def reject(self, request, pk=None):
+        solicitud = self.get_object()
+        user_empleado = request.user.empleado
+        if solicitud.aprobador_asignado != user_empleado:
+            return Response({'error': 'No tienes permiso para rechazar esta solicitud.'}, status=status.HTTP_403_FORBIDDEN)
+        if solicitud.estado != 'pendiente':
+            return Response({'error': 'Solo se pueden rechazar solicitudes pendientes.'}, status=status.HTTP_400_BAD_REQUEST)
+        solicitud.estado = 'rechazado'
+        solicitud.fecha_aprobacion = timezone.now()
+        solicitud.comentario_aprobador = request.data.get('comentario', 'Rechazado')
+        solicitud.save()
+        return Response(self.get_serializer(solicitud).data)

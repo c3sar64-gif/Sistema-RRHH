@@ -3,7 +3,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     UserCreate, EmpleadoViewSet, DepartamentoViewSet, CargoViewSet,
     FamiliarViewSet, EstudioViewSet, ContratoViewSet, get_current_user, UserViewSet,
-    JefesDepartamentoListView, PermisoViewSet
+    JefesDepartamentoListView, PermisoViewSet, HoraExtraViewSet
 )
 
 # Create a router and register our viewsets with it.
@@ -16,6 +16,7 @@ router.register(r'familiares', FamiliarViewSet)
 router.register(r'estudios', EstudioViewSet)
 router.register(r'contratos', ContratoViewSet)
 router.register(r'permisos', PermisoViewSet)
+router.register(r'horas-extras', HoraExtraViewSet)
 
 # The API URLs are now determined automatically by the router.
 urlpatterns = [

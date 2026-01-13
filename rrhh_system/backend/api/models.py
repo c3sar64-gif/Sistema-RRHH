@@ -155,3 +155,26 @@ class Permiso(models.Model):
 
     def __str__(self):
         return f'Permiso para {self.empleado} - {self.fecha_solicitud}'
+
+# --- Choices for Hora Extra ---
+TIPO_HORA_EXTRA_CHOICES = [
+    ('compensacion', 'Compensación de Hrs Extra'),
+    ('horas_extras', 'Horas Extras'),
+]
+
+# --- Hora Extra Model ---
+
+class HoraExtra(models.Model):
+    empleado = models.ForeignKey(Empleado, on_delete=models.CASCADE, related_name='horas_extras')
+    aprobador_asignado = models.ForeignKey(Empleado, on_delete=models.SET_NULL, null=True, blank=True, related_name='horas_extras_a_aprobar')
+    fecha_solicitud = models.DateField()
+    tipo_hora_extra = models.CharField(max_length=20, choices=TIPO_HORA_EXTRA_CHOICES)
+    observacion = models.TextField(blank=True, null=True)
+    hora_inicio = models.TimeField()
+    hora_fin = models.TimeField()
+    estado = models.CharField(max_length=20, choices=ESTADO_PERMISO_CHOICES, default='pendiente')
+    comentario_aprobador = models.TextField(blank=True, null=True)
+    fecha_aprobacion = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f'Hora Extra {self.get_tipo_hora_extra_display()} para {self.empleado} - {self.fecha_solicitud}'

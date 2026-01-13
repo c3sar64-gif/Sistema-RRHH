@@ -51,6 +51,13 @@ export const AppLayout: React.FC = () => {
               <ClockIcon />
               <span className="mx-4">Permisos</span>
             </NavLink>
+            {/* Restrict Horas Extras visibility */}
+            {(isAdmin || isRRHH || (user?.empleado_nombre && ['Alcira Fuentes Marcusi', 'Esteban Martinez Manuel'].includes(user.empleado_nombre))) && (
+              <NavLink to="/horas-extras" className={({ isActive }) => `${navLinkClasses} ${isActive ? activeNavLinkClasses : ''}`}>
+                <ClockIcon />
+                <span className="mx-4">Horas Extras</span>
+              </NavLink>
+            )}
 
             {/* Admin-only Link */}
             {isAdmin && (

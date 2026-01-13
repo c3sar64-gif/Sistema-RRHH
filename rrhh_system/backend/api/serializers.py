@@ -2,7 +2,7 @@ from rest_framework import serializers
 from django.db import transaction
 from django.contrib.auth.models import User, Group
 from .models import (
-    Empleado, Departamento, Cargo, Familiar, Estudio, Contrato, Permiso
+    Empleado, Departamento, Cargo, Familiar, Estudio, Contrato, Permiso, HoraExtra
 )
 
 class GroupSerializer(serializers.ModelSerializer):
@@ -265,6 +265,23 @@ class PermisoSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Permiso
+        fields = '__all__'
+        read_only_fields = [
+            'empleado_info',
+            'aprobador_asignado',
+            'aprobador_asignado_info',
+            'departamento_nombre',
+            'fecha_aprobacion',
+            'comentario_aprobador',
+        ]
+
+class HoraExtraSerializer(serializers.ModelSerializer):
+    empleado_info = JefeSerializer(source='empleado', read_only=True)
+    aprobador_asignado_info = JefeSerializer(source='aprobador_asignado', read_only=True)
+    departamento_nombre = serializers.CharField(source='empleado.departamento.nombre', read_only=True, allow_null=True)
+
+    class Meta:
+        model = HoraExtra
         fields = '__all__'
         read_only_fields = [
             'empleado_info',
