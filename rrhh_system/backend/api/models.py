@@ -201,6 +201,7 @@ class SolicitudVacacion(models.Model):
     
     empleado = models.ForeignKey(Empleado, on_delete=models.CASCADE, related_name='solicitudes_vacacion')
     aprobador = models.ForeignKey(Empleado, on_delete=models.SET_NULL, null=True, blank=True, related_name='vacaciones_a_aprobar')
+    contrato = models.ForeignKey('Contrato', on_delete=models.SET_NULL, null=True, blank=True, related_name='solicitudes_vacacion')
     fecha_solicitud = models.DateField(auto_now_add=True)
     fecha_inicio = models.DateField()
     fecha_fin = models.DateField()
@@ -225,19 +226,23 @@ class VacacionMovimiento(models.Model):
     ]
 
     empleado = models.ForeignKey(Empleado, on_delete=models.CASCADE, related_name='movimientos_vacacion')
-    periodo = models.ForeignKey(VacacionPeriodo, on_delete=models.CASCADE, related_name='movimientos')
+    periodo = models.ForeignKey('VacacionPeriodo', on_delete=models.CASCADE, related_name='movimientos')
+    contrato = models.ForeignKey('Contrato', on_delete=models.SET_NULL, null=True, blank=True, related_name='movimientos_vacacion')
     fecha = models.DateField(auto_now_add=True)
     tipo = models.CharField(max_length=50, choices=TIPO_CHOICES)
     dias = models.DecimalField(max_digits=6, decimal_places=2, help_text="Valor positivo aumenta saldo, negativo resta")
     solicitud = models.ForeignKey(SolicitudVacacion, on_delete=models.SET_NULL, null=True, blank=True, related_name='movimientos')
     detalle = models.CharField(max_length=255, blank=True, null=True)
+
+    def __str__(self):
+        return f"{self.tipo} ({self.dias}) - {self.empleado}"
+
 class VacacionGuardada(models.Model):
     empleado = models.ForeignKey(Empleado, on_delete=models.CASCADE, related_name='vacaciones_guardadas_list')
+    contrato = models.ForeignKey('Contrato', on_delete=models.SET_NULL, null=True, blank=True, related_name='vacaciones_guardadas')
     dias = models.DecimalField(max_digits=5, decimal_places=1)
     gestion = models.CharField(max_length=50, blank=True, null=True, help_text="Gestión o motivo (ej. 2022-2023)")
     fecha_creacion = models.DateField(auto_now_add=True)
     
     def __str__(self):
         return f"{self.empleado} - {self.dias} días ({self.gestion})"
-    def __str__(self):
-        return f"{self.tipo} ({self.dias}) - {self.empleado}"

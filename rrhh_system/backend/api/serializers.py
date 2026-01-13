@@ -314,15 +314,22 @@ class SolicitudVacacionSerializer(serializers.ModelSerializer):
     empleado_info = JefeSerializer(source='empleado', read_only=True)
     aprobador_info = JefeSerializer(source='aprobador', read_only=True)
     departamento_nombre = serializers.CharField(source='empleado.departamento.nombre', read_only=True, allow_null=True)
+    contrato_nombre = serializers.SerializerMethodField()
 
     class Meta:
         model = SolicitudVacacion
         fields = '__all__'
-        read_only_fields = ['dias_calculados', 'fecha_solicitud', 'estado', 'fecha_aprobacion', 'comentario_aprobador', 'empleado_info', 'aprobador_info', 'departamento_nombre']
+        read_only_fields = ['dias_calculados', 'fecha_solicitud', 'estado', 'fecha_aprobacion', 'comentario_aprobador', 'empleado_info', 'aprobador_info', 'departamento_nombre', 'contrato_nombre']
+    
+    def get_contrato_nombre(self, obj):
+        if obj.contrato:
+            return f"Contrato {obj.contrato.fecha_inicio} al {obj.contrato.fecha_fin or 'Presente'}"
+        return None
 
 class VacacionGuardadaSerializer(serializers.ModelSerializer):
     empleado_nombre = serializers.SerializerMethodField()
     departamento_nombre = serializers.CharField(source='empleado.departamento.nombre', read_only=True)
+    contrato_nombre = serializers.SerializerMethodField()
 
     class Meta:
         model = VacacionGuardada
@@ -330,3 +337,8 @@ class VacacionGuardadaSerializer(serializers.ModelSerializer):
     
     def get_empleado_nombre(self, obj):
         return f"{obj.empleado.nombres} {obj.empleado.apellido_paterno} {obj.empleado.apellido_materno or ''}".strip()
+
+    def get_contrato_nombre(self, obj):
+        if obj.contrato:
+            return f"Contrato {obj.contrato.fecha_inicio}"
+        return None

@@ -168,7 +168,11 @@ class PermisoViewSet(viewsets.ModelViewSet):
         
         # Admin, RRHH and Porteria groups can see all requests
         if user.is_superuser or user.groups.filter(name__in=['Admin', 'RRHH', 'Porteria']).exists():
-            return Permiso.objects.all().order_by('-fecha_solicitud')
+            qs = Permiso.objects.all().order_by('-fecha_solicitud')
+            empleado_id = self.request.query_params.get('empleado')
+            if empleado_id:
+                qs = qs.filter(empleado_id=empleado_id)
+            return qs
 
         if not hasattr(user, 'empleado'):
             return Permiso.objects.none()
@@ -437,11 +441,15 @@ class VacacionPeriodoViewSet(viewsets.ReadOnlyModelViewSet):
         # Calculate consumption (LTD Debits)
         # Sum all movements that are NOT the standard accumulation types ('inicio_contrato', 'acumulacion_anual')
         # This includes 'consumo' (negative), 'pago' (negative), 'ajuste' (any), 'traspaso' (any)
-        consumo_total = VacacionMovimiento.objects.filter(
-            empleado=empleado
-        ).exclude(
+        # IMPORTANT: We only count movements since the CURRENT cycle (effective_hire_date)
+        # Movements before that date were already handled in the "Cycle Closure" (cerrar_ciclo)
+        movimientos_qs = VacacionMovimiento.objects.filter(empleado=empleado).exclude(
             tipo__in=['inicio_contrato', 'acumulacion_anual']
-        ).aggregate(total=models.Sum('dias'))['total'] or 0.0
+        )
+        if effective_hire_date:
+            movimientos_qs = movimientos_qs.filter(fecha__gte=effective_hire_date)
+            
+        consumo_total = movimientos_qs.aggregate(total=models.Sum('dias'))['total'] or 0.0
         
         # Redefined Saldo Actual = (LTD Earned) + (LTD Guarded) + (LTD Movements/Consumptions)
         saldo_total = float(vacacion_cumplida) + float(guardadas_total) + float(consumo_total)
@@ -470,6 +478,61 @@ class VacacionPeriodoViewSet(viewsets.ReadOnlyModelViewSet):
             'anios_trabajados': antiguedad_detallada,
             'vacacion_cumplida': vacacion_cumplida
         })
+
+    @action(detail=False, methods=['post'], permission_classes=[IsAdminUser])
+    def cerrar_ciclo(self, request):
+        empleado_id = request.data.get('empleado_id')
+        dias_guardar = float(request.data.get('dias_guardar', 0))
+        dias_pagar = float(request.data.get('dias_pagar', 0))
+        nueva_fecha_ingreso = request.data.get('nueva_fecha_ingreso')
+        gestion_nombre = request.data.get('gestion_nombre', 'Liquidación de Ciclo')
+
+        if not empleado_id or not nueva_fecha_ingreso:
+            return Response({'error': 'Empleado y nueva fecha requeridos.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            empleado = Empleado.objects.get(pk=empleado_id)
+            with transaction.atomic():
+                # 1. Create Guarded record if days should be saved
+                current_contract = empleado.contratos.filter(estado_contrato='vigente').last()
+                
+                if dias_guardar > 0:
+                    VacacionGuardada.objects.create(
+                        empleado=empleado,
+                        contrato=current_contract,
+                        dias=dias_guardar,
+                        gestion=gestion_nombre
+                    )
+                
+                # 2. Register payout as a movement (optional but good for traceability)
+                if dias_pagar > 0:
+                    # Find active period
+                    periodo = VacacionPeriodo.objects.filter(empleado=empleado, activo=True).last()
+                    if not periodo:
+                         periodo = VacacionPeriodo.objects.create(
+                             empleado=empleado,
+                             fecha_inicio=empleado.fecha_ingreso_vigente or empleado.fecha_ingreso_inicial,
+                             activo=True
+                         )
+                    
+                    VacacionMovimiento.objects.create(
+                        empleado=empleado,
+                        periodo=periodo,
+                        contrato=current_contract,
+                        tipo='pago',
+                        dias=-dias_pagar,
+                        detalle=f"Pago en efectivo ciclo finalizado: {gestion_nombre}"
+                    )
+
+                # 3. Update Entrance Date
+                empleado.fecha_ingreso_vigente = nueva_fecha_ingreso
+                empleado.save()
+
+            return Response({'status': 'Ciclo cerrado exitosamente'})
+        except Empleado.DoesNotExist:
+            return Response({'error': 'Empleado no encontrado'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 class VacacionGuardadaViewSet(viewsets.ModelViewSet):
     queryset = VacacionGuardada.objects.all().order_by('-fecha_creacion')
@@ -518,7 +581,11 @@ class SolicitudVacacionViewSet(viewsets.ModelViewSet):
         user = self.request.user
         
         if user.is_superuser or user.groups.filter(name__in=['Admin', 'RRHH']).exists():
-            return SolicitudVacacion.objects.all().order_by('-fecha_solicitud')
+            qs = SolicitudVacacion.objects.all().order_by('-fecha_solicitud')
+            empleado_id = self.request.query_params.get('empleado')
+            if empleado_id:
+                qs = qs.filter(empleado_id=empleado_id)
+            return qs
 
         if not hasattr(user, 'empleado'):
             return SolicitudVacacion.objects.none()
@@ -611,9 +678,12 @@ class SolicitudVacacionViewSet(viewsets.ModelViewSet):
 
         # 5. Save and Create Movement immediately
         with transaction.atomic():
+            current_contract = empleado.contratos.filter(estado_contrato='vigente').last()
+            
             solicitud = serializer.save(
                 empleado=empleado, 
                 aprobador=aprobador,
+                contrato=current_contract,
                 dias_calculados=dias_calculados,
                 estado='aprobado',
                 fecha_aprobacion=timezone.now()
@@ -622,6 +692,7 @@ class SolicitudVacacionViewSet(viewsets.ModelViewSet):
             VacacionMovimiento.objects.create(
                 empleado=solicitud.empleado,
                 periodo=periodo_activo,
+                contrato=current_contract,
                 tipo='consumo',
                 dias=-solicitud.dias_calculados,
                 solicitud=solicitud,

@@ -16,6 +16,7 @@ interface VacacionGuardada {
     gestion: string;
     fecha_creacion: string;
     departamento_nombre?: string;
+    contrato_nombre?: string;
 }
 
 const VacacionesGuardadasPage: React.FC = () => {
@@ -211,6 +212,7 @@ const VacacionesGuardadasPage: React.FC = () => {
                             <thead className="bg-gray-50">
                                 <tr>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Empleado</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contrato Origen</th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Días</th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Gestión / Motivo</th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha Registro</th>
@@ -222,6 +224,9 @@ const VacacionesGuardadasPage: React.FC = () => {
                                     <tr key={item.id} className="hover:bg-gray-50 transition">
                                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                                             {item.empleado_nombre}
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 italic">
+                                            {item.contrato_nombre || 'N/A'}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <span className="px-3 py-1 inline-flex text-sm leading-5 font-semibold rounded-full bg-green-100 text-green-800">

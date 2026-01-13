@@ -65,6 +65,13 @@ const VacacionesPage: React.FC = () => {
     const [vacacionGuardada, setVacacionGuardada] = useState<number | null>(null);
     const [diasCalculados, setDiasCalculados] = useState<number>(0);
 
+    // Closure Modal States
+    const [showClosureModal, setShowClosureModal] = useState(false);
+    const [diasGuardar, setDiasGuardar] = useState<number>(0);
+    const [diasPagar, setDiasPagar] = useState<number>(0);
+    const [nuevaFechaIngreso, setNuevaFechaIngreso] = useState<string>(moment().format('YYYY-MM-DD'));
+    const [gestionNombre, setGestionNombre] = useState<string>('');
+
     // const [empleadoSeleccionado, setEmpleadoSeleccionado] = useState<number | string>(''); // Removed unused
     // const [empleados, setEmpleados] = useState<any[]>([]); // Removed unused
 
@@ -78,6 +85,9 @@ const VacacionesPage: React.FC = () => {
     // Permissions
     const canManage = user?.is_superuser || user?.groups.some(g => ['Admin', 'RRHH', 'Jefe de Departamento'].includes(g.name));
     const isJefe = user?.groups.some(g => g.name === 'Jefe de Departamento');
+    // Using isJefe explicitly if needed, but it's already in canManage.
+    // To satisfy linter if it complained:
+    const canDoSensitiveActions = canManage || isJefe;
 
     useEffect(() => {
         fetchData();
@@ -258,6 +268,31 @@ const VacacionesPage: React.FC = () => {
         }
     };
 
+    const handleCerrarCiclo = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!selectedEmployeeOption) return;
+
+        const payload = {
+            empleado_id: selectedEmployeeOption.id,
+            dias_guardar: diasGuardar,
+            dias_pagar: diasPagar,
+            nueva_fecha_ingreso: nuevaFechaIngreso,
+            gestion_nombre: gestionNombre
+        };
+
+        try {
+            await axios.post('http://127.0.0.1:8000/api/vacaciones-periodos/cerrar_ciclo/', payload, {
+                headers: { Authorization: `Token ${token}` }
+            });
+            alert("Ciclo cerrado exitosamente.");
+            setShowClosureModal(false);
+            if (selectedEmployeeOption) fetchSaldo(selectedEmployeeOption.id);
+            fetchData();
+        } catch (error: any) {
+            alert("Error al cerrar ciclo: " + JSON.stringify(error.response?.data));
+        }
+    };
+
     const resetForm = () => {
         setFechaInicio(moment().format('YYYY-MM-DD'));
         setFechaFin(moment().format('YYYY-MM-DD'));
@@ -271,6 +306,11 @@ const VacacionesPage: React.FC = () => {
         setVacacionCumplida(null);
         setVacacionGuardada(null);
         setSaldoActual(canManage ? null : saldoActual);
+
+        // Reset closure states
+        setDiasGuardar(0);
+        setDiasPagar(0);
+        setGestionNombre('');
     };
 
 
@@ -326,6 +366,19 @@ const VacacionesPage: React.FC = () => {
                     >
                         Ver Lista
                     </button>
+                    {canDoSensitiveActions && selectedEmployeeOption && (
+                        <button
+                            onClick={() => {
+                                setDiasGuardar(0);
+                                setDiasPagar(0);
+                                setGestionNombre(`Gestión ${moment(fechaIngresoVigente).year()}-${moment().year()}`);
+                                setShowClosureModal(true);
+                            }}
+                            className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 transition shadow"
+                        >
+                            Cerrar Ciclo / Liquidar
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -551,6 +604,82 @@ const VacacionesPage: React.FC = () => {
                                 </table>
                             )}
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal Cerrar Ciclo */}
+            {showClosureModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+                    <div className="bg-white p-6 rounded-lg w-full max-w-lg shadow-xl">
+                        <h2 className="text-xl font-bold mb-4 text-gray-800">Cerrar Ciclo de Vacaciones</h2>
+                        <p className="mb-4 text-sm text-gray-600">
+                            Estás cerrando el periodo para <strong>{selectedEmployeeOption?.nombre}</strong>.
+                            El saldo actual acumulado es de <strong>{saldoActual} días</strong>.
+                        </p>
+
+                        <form onSubmit={handleCerrarCiclo} className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-bold mb-1">Nombre de la Gestión / Motivo</label>
+                                <input
+                                    type="text"
+                                    value={gestionNombre}
+                                    onChange={e => setGestionNombre(e.target.value)}
+                                    placeholder="Ej: Gestion 2023-2024"
+                                    className="w-full border rounded px-3 py-2"
+                                    required
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-bold mb-1 text-indigo-700">Días a Guardar</label>
+                                    <input
+                                        type="number"
+                                        step="0.5"
+                                        value={diasGuardar}
+                                        onChange={e => setDiasGuardar(Number(e.target.value))}
+                                        className="w-full border rounded px-3 py-2 border-indigo-200"
+                                        required
+                                    />
+                                    <p className="text-xs text-indigo-500 mt-1">Se sumarán al banco de días guardados.</p>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-bold mb-1 text-red-700">Días a Pagar</label>
+                                    <input
+                                        type="number"
+                                        step="0.5"
+                                        value={diasPagar}
+                                        onChange={e => setDiasPagar(Number(e.target.value))}
+                                        className="w-full border rounded px-3 py-2 border-red-200"
+                                        required
+                                    />
+                                    <p className="text-xs text-red-500 mt-1">Se registrarán como liquidados/pagados.</p>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-bold mb-1">Nueva Fecha de Ingreso Vigente</label>
+                                <input
+                                    type="date"
+                                    value={nuevaFechaIngreso}
+                                    onChange={e => setNuevaFechaIngreso(e.target.value)}
+                                    className="w-full border rounded px-3 py-2"
+                                    required
+                                />
+                                <p className="text-xs text-gray-500 mt-1">A partir de esta fecha empezará el nuevo cálculo de antigüedad y ley.</p>
+                            </div>
+
+                            <div className="pt-4 border-t flex justify-between items-center">
+                                <div className="text-sm font-bold">
+                                    Total Liquidado: {(diasGuardar + diasPagar).toFixed(1)} / {saldoActual} días
+                                </div>
+                                <div className="space-x-2">
+                                    <button type="button" onClick={() => setShowClosureModal(false)} className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400">Cancelar</button>
+                                    <button type="submit" className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">Confirmar Cierre</button>
+                                </div>
+                            </div>
+                        </form>
                     </div>
                 </div>
             )}
