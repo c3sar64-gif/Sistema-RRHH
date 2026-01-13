@@ -198,6 +198,7 @@ export const UserAdminPage: React.FC = () => {
                 <option>Jefe de Departamento</option>
                 <option>RRHH</option>
                 <option>Admin</option>
+                <option>Porteria</option>
               </select>
             </div>
 
@@ -251,6 +252,7 @@ export const UserAdminPage: React.FC = () => {
                 <option>RRHH</option>
                 <option>Admin</option>
                 <option>Jefe de Departamento</option>
+                <option>Porteria</option>
               </select>
             </div>
           </div>

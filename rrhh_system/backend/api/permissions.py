@@ -19,4 +19,4 @@ class IsStaffUser(BasePermission):
         if not (request.user and request.user.is_authenticated):
             return False
         
-        return request.user.is_superuser or request.user.groups.filter(name__in=['Admin', 'RRHH', 'Encargado', 'Jefe de Departamento']).exists()
+        return request.user.is_superuser or request.user.groups.filter(name__in=['Admin', 'RRHH', 'Encargado', 'Jefe de Departamento', 'Porteria']).exists()

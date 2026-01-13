@@ -118,6 +118,8 @@ export const PermisosPage: React.FC = () => {
 
     const isAdminOrHR = user?.is_superuser || user?.groups.some(g => ['Admin', 'RRHH', 'Encargado', 'Jefe de Departamento'].includes(g.name));
     const isJefeDepto = user?.groups.some(g => g.name === 'Jefe de Departamento');
+    const isPorteria = user?.groups.some(g => g.name === 'Porteria');
+    const canViewAll = isAdminOrHR || isPorteria;
 
     const fetchData = async () => {
         setLoading(true);
@@ -143,8 +145,8 @@ export const PermisosPage: React.FC = () => {
 
             setCalendarEvents(events);
 
-            // Conditional fetch for Admin/HR/Encargado data
-            if (isAdminOrHR) {
+            // Conditional fetch for Admin/HR/Encargado/Porteria data
+            if (canViewAll) {
                 const [departmentsRes, jefesRes, employeesRes] = await Promise.all([
                     axios.get('http://127.0.0.1:8000/api/departamentos/?no_pagination=true', { headers: { 'Authorization': `Token ${token}` } }),
                     axios.get('http://127.0.0.1:8000/api/jefes-departamento/', { headers: { 'Authorization': `Token ${token}` } }),
@@ -168,6 +170,14 @@ export const PermisosPage: React.FC = () => {
             fetchData();
         }
     }, [token, user]);
+
+    useEffect(() => {
+        if (isPorteria) {
+            setView('day');
+        } else {
+            setView('month');
+        }
+    }, [isPorteria]);
 
     // Auto-select Jefe for JefeDepto users
     useEffect(() => {
@@ -391,9 +401,11 @@ export const PermisosPage: React.FC = () => {
 
             <div className="flex justify-between items-center mb-6 no-print">
                 <h1 className="text-3xl font-bold text-gray-800">Permisos</h1>
-                <button onClick={() => setIsModalOpen(true)} className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 font-semibold shadow-md">
-                    Registrar Permiso
-                </button>
+                {!isPorteria && (
+                    <button onClick={() => setIsModalOpen(true)} className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 font-semibold shadow-md">
+                        Registrar Permiso
+                    </button>
+                )}
             </div>
 
             {loading ? <div>Cargando...</div> : error ? <div className="text-red-500 bg-red-100 p-4 rounded-lg">{error}</div> : (
@@ -410,6 +422,7 @@ export const PermisosPage: React.FC = () => {
                         date={date}
                         onNavigate={setDate}
                         popup
+                        dayLayoutAlgorithm="no-overlap"
                         culture="es"
                         formats={formats}
                         selectable

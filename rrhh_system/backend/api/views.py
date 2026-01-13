@@ -153,8 +153,8 @@ class PermisoViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         
-        # Admin and RRHH groups can see all requests
-        if user.is_superuser or user.groups.filter(name__in=['Admin', 'RRHH']).exists():
+        # Admin, RRHH and Porteria groups can see all requests
+        if user.is_superuser or user.groups.filter(name__in=['Admin', 'RRHH', 'Porteria']).exists():
             return Permiso.objects.all().order_by('-fecha_solicitud')
 
         if not hasattr(user, 'empleado'):
