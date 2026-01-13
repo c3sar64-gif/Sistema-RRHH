@@ -261,6 +261,7 @@ class CargoSerializer(serializers.ModelSerializer):
 class PermisoSerializer(serializers.ModelSerializer):
     empleado_info = JefeSerializer(source='empleado', read_only=True)
     aprobador_asignado_info = JefeSerializer(source='aprobador_asignado', read_only=True)
+    departamento_nombre = serializers.CharField(source='empleado.departamento.nombre', read_only=True, allow_null=True)
 
     class Meta:
         model = Permiso
@@ -269,6 +270,7 @@ class PermisoSerializer(serializers.ModelSerializer):
             'empleado_info',
             'aprobador_asignado',
             'aprobador_asignado_info',
+            'departamento_nombre',
             'fecha_aprobacion',
             'comentario_aprobador',
         ]

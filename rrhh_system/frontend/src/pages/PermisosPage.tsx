@@ -11,7 +11,7 @@ import 'react-big-calendar/lib/css/react-big-calendar.css';
 import { SearchableSelect } from '../components/SearchableSelect';
 import './CalendarOverrides.css';
 
-import 'moment/locale/es'; // Import Spanish locale
+import 'moment/dist/locale/es'; // Import Spanish locale
 
 // Set moment locale to Spanish globally
 moment.locale('es');
@@ -37,6 +37,7 @@ interface Permiso {
     estado: string;
     comentario_aprobador?: string;
     fecha_aprobacion?: string;
+    departamento_nombre?: string;
 }
 
 interface PermisoFormState {
@@ -61,32 +62,17 @@ const initialFormState: PermisoFormState = {
 
 // --- Main Component ---
 // Custom Date Header Component
-// Custom Date Header Component
 const CustomDateHeader = ({ label, date }: { label: string, date: Date }) => {
     // Determine if the date is today using strict string comparison
     const isToday = moment(date).format('YYYY-MM-DD') === moment().format('YYYY-MM-DD');
 
     return (
-        <div className="rbc-date-cell">
-            {isToday ? (
-                <span style={{
-                    display: 'inline-block',
-                    width: '32px',
-                    height: '32px',
-                    lineHeight: '32px',
-                    backgroundColor: '#1a73e8',
-                    color: 'white',
-                    borderRadius: '50%',
-                    textAlign: 'center',
-                    boxShadow: '0 0 0 4px #d2e3fc',
-                    fontWeight: 'bold',
-                    fontSize: '0.9rem'
-                }}>
-                    {label}
-                </span>
-            ) : (
-                label
-            )}
+        <div className="rbc-date-cell flex justify-center items-center py-1">
+            <span
+                className={`date-number-circle ${isToday ? 'today' : ''}`}
+            >
+                {label}
+            </span>
         </div>
     );
 };
@@ -96,17 +82,12 @@ export const PermisosPage: React.FC = () => {
 
     // Force Spanish locale on mount
     useEffect(() => {
-        try {
-            require('moment/locale/es');
-            moment.locale('es');
-        } catch (e) {
-            console.error("Error setting locale", e);
-        }
+        moment.locale('es');
     }, []);
 
     const formats = {
         monthHeaderFormat: (date: Date) => moment(date).format('MMMM YYYY'),
-        weekdayFormat: (date: Date) => moment(date).format('ddd'),
+        weekdayFormat: (date: Date) => moment(date).format('dddd'), // Full weekday name
         dayFormat: (date: Date) => moment(date).format('DD ddd'),
         dayHeaderFormat: (date: Date) => moment(date).format('dddd DD MMM'),
     };
@@ -204,22 +185,14 @@ export const PermisosPage: React.FC = () => {
             if (managedDepts.length === 1) {
                 setSelectedDepartamento(managedDepts[0].id);
             } else {
-                // Do not reset if already selected and valid? 
-                // For now, reset to force choice if multiple, or keep if valid.
-                // To keep it simple and safe:
                 if (selectedDepartamento && !managedDepts.find(d => d.id === selectedDepartamento)) {
                     setSelectedDepartamento(null);
                 } else if (!selectedDepartamento) {
-                    // If nothing selected, stay null
                     setSelectedDepartamento(null);
                 }
             }
         } else {
             setFilteredDepartamentos(allDepartments);
-            // Only reset if we were filtering?
-            // If no Jefe selected (Admin view generally), we might want to see all departments?
-            // Code before was: setFilteredDepartamentos(allDepartments); setSelectedDepartamento(null);
-            // I'll stick to clearing department if jefe is cleared, logical hierarchy.
             setSelectedDepartamento(null);
         }
         setFormState(p => ({ ...p, empleado: null }));
@@ -271,12 +244,9 @@ export const PermisosPage: React.FC = () => {
     const handleUpdateStatus = async (id: number, newStatus: string) => {
         try {
             await axios.patch(`http://127.0.0.1:8000/api/permisos/${id}/`, { estado: newStatus }, { headers: { 'Authorization': `Token ${token}` } });
-            // Update local state to reflect change immediately (optimistic or re-fetch)
             setPermisos(prev => prev.map(p => p.id === id ? { ...p, estado: newStatus } : p));
-            // Also update calendar events
             setCalendarEvents(prev => prev.map(e => e.id === id ? { ...e, resource: { ...e.resource, estado: newStatus } } : e));
 
-            // If currently viewing this event, update it too
             if (viewEvent && viewEvent.id === id) {
                 setViewEvent({ ...viewEvent, estado: newStatus });
             }
@@ -304,7 +274,7 @@ export const PermisosPage: React.FC = () => {
                 className = 'event-cancelled';
                 break;
             default:
-                className = ''; // Default is purple from CSS
+                className = '';
         }
         return { className };
     };
@@ -328,9 +298,98 @@ export const PermisosPage: React.FC = () => {
         );
     };
 
+    const handlePrint = () => {
+        window.print();
+    };
+
     return (
         <div>
-            <div className="flex justify-between items-center mb-6">
+            {/* Printable Area - Hidden by default, visible on print */}
+            <div className="hidden print:block printable-area bg-white p-8">
+                {viewEvent && (
+                    <div className="max-w-3xl mx-auto font-sans text-gray-900 border-2 border-gray-800 p-8">
+                        {/* Header */}
+                        <div className="text-center border-b-2 border-gray-800 pb-4 mb-6">
+                            <h1 className="text-2xl font-bold uppercase">Papeleta de Permiso</h1>
+                            <p className="text-sm text-gray-600 mt-1">Departamento de Recursos Humanos</p>
+                        </div>
+
+                        {/* Content Grid */}
+                        <div className="grid grid-cols-2 gap-x-8 gap-y-4 text-sm mb-12">
+                            <div className="col-span-2 flex justify-between items-center mb-2">
+                                <div>
+                                    <span className="font-bold">N° de Permiso:</span>
+                                    <span className="ml-2 font-mono text-lg">{viewEvent.id}</span>
+                                </div>
+                                <div>
+                                    <span className="font-bold">Fecha Solicitud:</span>
+                                    <span className="ml-2">{moment(viewEvent.fecha_solicitud).format('LL')}</span>
+                                </div>
+                            </div>
+
+                            <div className="col-span-2 border-b border-gray-300 my-2"></div>
+
+                            <div>
+                                <span className="font-bold block text-gray-600 text-xs uppercase tracking-wider">Departamento</span>
+                                <span className="text-base">{viewEvent.departamento_nombre || 'N/A'}</span>
+                            </div>
+
+                            <div>
+                                <span className="font-bold block text-gray-600 text-xs uppercase tracking-wider">Empleado</span>
+                                <span className="text-base">{viewEvent.empleado_info.nombres} {viewEvent.empleado_info.apellido_paterno} {viewEvent.empleado_info.apellido_materno || ''}</span>
+                            </div>
+
+                            <div>
+                                <span className="font-bold block text-gray-600 text-xs uppercase tracking-wider">Motivo</span>
+                                <span className="text-base capitalize">{viewEvent.tipo_permiso.replace('_', ' ')}</span>
+                            </div>
+
+                            <div>
+                                <span className="font-bold block text-gray-600 text-xs uppercase tracking-wider">Observación</span>
+                                <span className="text-base">{viewEvent.observacion || '-'}</span>
+                            </div>
+
+                            <div>
+                                <span className="font-bold block text-gray-600 text-xs uppercase tracking-wider">Hora Salida</span>
+                                <span className="text-base">{viewEvent.hora_salida.substring(0, 5)}</span>
+                            </div>
+
+                            <div>
+                                <span className="font-bold block text-gray-600 text-xs uppercase tracking-wider">Hora Regreso</span>
+                                <span className="text-base">{viewEvent.hora_regreso.substring(0, 5)}</span>
+                            </div>
+                        </div>
+
+                        {/* Signatures */}
+                        <div className="grid grid-cols-2 gap-16 mt-20 pt-10">
+                            <div className="text-center">
+                                <div className="border-t border-gray-800 w-full pt-2"></div>
+                                <p className="font-bold">Firma Jefe de Departamento</p>
+                                <p className="text-xs text-gray-500 mt-1">
+                                    {viewEvent.aprobador_asignado_info ?
+                                        `${viewEvent.aprobador_asignado_info.nombres} ${viewEvent.aprobador_asignado_info.apellido_paterno} ${viewEvent.aprobador_asignado_info.apellido_materno || ''}`.trim() :
+                                        '______________________'}
+                                </p>
+                            </div>
+                            <div className="text-center">
+                                <div className="border-t border-gray-800 w-full pt-2"></div>
+                                <p className="font-bold">Firma Empleado</p>
+                                <p className="text-xs text-gray-500 mt-1">
+                                    {viewEvent.empleado_info.nombres} {viewEvent.empleado_info.apellido_paterno} {viewEvent.empleado_info.apellido_materno || ''}
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="mt-12 text-center text-xs text-gray-400">
+                            <p>Este documento es constancia de la autorización del permiso solicitado.</p>
+                            <p>Generado el: {moment().format('LLLL')}</p>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            <div className="flex justify-between items-center mb-6 no-print">
                 <h1 className="text-3xl font-bold text-gray-800">Permisos</h1>
                 <button onClick={() => setIsModalOpen(true)} className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 font-semibold shadow-md">
                     Registrar Permiso
@@ -338,7 +397,7 @@ export const PermisosPage: React.FC = () => {
             </div>
 
             {loading ? <div>Cargando...</div> : error ? <div className="text-red-500 bg-red-100 p-4 rounded-lg">{error}</div> : (
-                <div className="bg-white p-6 rounded-lg shadow-md" style={{ height: '85vh' }}>
+                <div className="bg-white p-6 rounded-lg shadow-md no-print" style={{ height: '85vh' }}>
                     <Calendar
                         localizer={localizer}
                         events={calendarEvents}
@@ -385,7 +444,7 @@ export const PermisosPage: React.FC = () => {
             {/* Modal de Detalle de Permiso (Estilo Google Calendar Popover) */}
             <Modal isOpen={!!viewEvent} onClose={() => setViewEvent(null)}>
                 {viewEvent && (
-                    <div className="space-y-4">
+                    <div className="space-y-4 no-print">
                         <div className="flex justify-between items-start">
                             <h2 className="text-xl font-bold text-gray-800">{viewEvent.tipo_permiso.charAt(0).toUpperCase() + viewEvent.tipo_permiso.slice(1).replace('_', ' ')}</h2>
                             <span className={`px-2 py-1 text-xs font-semibold rounded-full ${viewEvent.estado === 'aprobado' ? 'bg-green-100 text-green-800' :
@@ -405,6 +464,10 @@ export const PermisosPage: React.FC = () => {
                                 <div className="flex items-center">
                                     <span className="font-semibold w-24">Fecha:</span>
                                     <span>{moment(viewEvent.fecha_solicitud).format('LL')}</span>
+                                </div>
+                                <div className="flex items-center">
+                                    <span className="font-semibold w-24">Depto:</span>
+                                    <span>{viewEvent.departamento_nombre || (allDepartments.find(d => d.id === viewEvent.empleado_info.departamento)?.nombre) || '-'}</span>
                                 </div>
                                 <div className="flex items-center">
                                     <span className="font-semibold w-24">Horario:</span>
@@ -428,6 +491,19 @@ export const PermisosPage: React.FC = () => {
                         </div>
 
                         <div className="flex justify-end gap-2 pt-4 border-t border-gray-100 mt-4">
+                            {viewEvent.estado === 'aprobado' && (
+                                <button
+                                    onClick={handlePrint}
+                                    className="px-6 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 font-medium text-sm flex items-center gap-2"
+                                    title="Imprimir"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                                    </svg>
+                                    Imprimir
+                                </button>
+                            )}
+
                             {isAdminOrHR && viewEvent.estado !== 'aprobado' && (
                                 <button
                                     onClick={() => handleUpdateStatus(viewEvent.id, 'aprobado')}
@@ -464,91 +540,93 @@ export const PermisosPage: React.FC = () => {
             </Modal>
 
             <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
-                <form onSubmit={handleSubmit} className="space-y-6">
-                    <h2 className="text-2xl font-bold text-gray-800">Registrar Permiso por Horas</h2>
-                    {formErrors.general && <div className="text-red-500 bg-red-100 p-3 rounded-lg mb-4">{formErrors.general}</div>}
+                <div className="no-print">
+                    <form onSubmit={handleSubmit} className="space-y-6">
+                        <h2 className="text-2xl font-bold text-gray-800">Registrar Permiso por Horas</h2>
+                        {formErrors.general && <div className="text-red-500 bg-red-100 p-3 rounded-lg mb-4">{formErrors.general}</div>}
 
-                    {isAdminOrHR && (
-                        <>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {isAdminOrHR && (
+                            <>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label>Jefe de Departamento</label>
+                                        <SearchableSelect
+                                            options={allJefes.map(j => ({ id: j.id, nombre: `${j.nombres} ${j.apellido_paterno} ${j.apellido_materno || ''}`.trim() }))}
+                                            selected={(() => {
+                                                if (!selectedJefe) return null;
+                                                const jefe = allJefes.find(j => j.id === selectedJefe);
+                                                return jefe ? { id: jefe.id, nombre: `${jefe.nombres} ${jefe.apellido_paterno} ${jefe.apellido_materno || ''}`.trim() } : null;
+                                            })()}
+                                            onChange={option => setSelectedJefe(option?.id || null)}
+                                            disabled={isJefeDepto}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label>Departamento a Cargo</label>
+                                        <SearchableSelect options={filteredDepartamentos.map(d => ({ id: d.id, nombre: d.nombre }))} onChange={option => setSelectedDepartamento(option?.id || null)} selected={selectedDepartamento ? { id: selectedDepartamento, nombre: allDepartments.find(d => d.id === selectedDepartamento)?.nombre || '' } : null} disabled={!selectedJefe || (isJefeDepto && filteredDepartamentos.length === 1)} />
+                                    </div>
+                                </div>
                                 <div>
-                                    <label>Jefe de Departamento</label>
+                                    <label>Empleado</label>
                                     <SearchableSelect
-                                        options={allJefes.map(j => ({ id: j.id, nombre: `${j.nombres} ${j.apellido_paterno} ${j.apellido_materno || ''}`.trim() }))}
+                                        options={filteredEmpleados.map(e => ({ id: e.id, nombre: `${e.nombres} ${e.apellido_paterno} ${e.apellido_materno || ''}`.trim() }))}
                                         selected={(() => {
-                                            if (!selectedJefe) return null;
-                                            const jefe = allJefes.find(j => j.id === selectedJefe);
-                                            return jefe ? { id: jefe.id, nombre: `${jefe.nombres} ${jefe.apellido_paterno} ${jefe.apellido_materno || ''}`.trim() } : null;
+                                            if (!formState.empleado) return null;
+                                            const empleado = allEmployees.find(e => e.id === formState.empleado);
+                                            return empleado ? { id: empleado.id, nombre: `${empleado.nombres} ${empleado.apellido_paterno} ${empleado.apellido_materno || ''}`.trim() } : null;
                                         })()}
-                                        onChange={option => setSelectedJefe(option?.id || null)}
-                                        disabled={isJefeDepto}
+                                        onChange={option => setFormState(p => ({ ...p, empleado: option?.id || null }))}
+                                        disabled={!selectedDepartamento}
                                     />
                                 </div>
                                 <div>
-                                    <label>Departamento a Cargo</label>
-                                    <SearchableSelect options={filteredDepartamentos.map(d => ({ id: d.id, nombre: d.nombre }))} onChange={option => setSelectedDepartamento(option?.id || null)} selected={selectedDepartamento ? { id: selectedDepartamento, nombre: allDepartments.find(d => d.id === selectedDepartamento)?.nombre || '' } : null} disabled={!selectedJefe || (isJefeDepto && filteredDepartamentos.length === 1)} />
+                                    <label>Estado</label>
+                                    <select name="estado" value={formState.estado} onChange={handleInputChange} className={inputStyles}>
+                                        <option value="pendiente">Pendiente</option>
+                                        <option value="aprobado">Aprobado</option>
+                                        <option value="anulado">Anulado</option>
+                                    </select>
                                 </div>
+                            </>
+                        )}
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label>Fecha del Permiso</label>
+                                <input type="date" name="fecha_solicitud" value={formState.fecha_solicitud} onChange={handleInputChange} className={inputStyles} />
                             </div>
                             <div>
-                                <label>Empleado</label>
-                                <SearchableSelect
-                                    options={filteredEmpleados.map(e => ({ id: e.id, nombre: `${e.nombres} ${e.apellido_paterno} ${e.apellido_materno || ''}`.trim() }))}
-                                    selected={(() => {
-                                        if (!formState.empleado) return null;
-                                        const empleado = allEmployees.find(e => e.id === formState.empleado);
-                                        return empleado ? { id: empleado.id, nombre: `${empleado.nombres} ${empleado.apellido_paterno} ${empleado.apellido_materno || ''}`.trim() } : null;
-                                    })()}
-                                    onChange={option => setFormState(p => ({ ...p, empleado: option?.id || null }))}
-                                    disabled={!selectedDepartamento}
-                                />
-                            </div>
-                            <div>
-                                <label>Estado</label>
-                                <select name="estado" value={formState.estado} onChange={handleInputChange} className={inputStyles}>
-                                    <option value="pendiente">Pendiente</option>
-                                    <option value="aprobado">Aprobado</option>
-                                    <option value="anulado">Anulado</option>
+                                <label>Tipo de Permiso</label>
+                                <select name="tipo_permiso" value={formState.tipo_permiso} onChange={handleInputChange} className={inputStyles}>
+                                    <option value="trabajo">Trabajo</option>
+                                    <option value="personal">Personal</option>
+                                    <option value="hora_almuerzo">Hora Almuerzo</option>
                                 </select>
                             </div>
-                        </>
-                    )}
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label>Fecha del Permiso</label>
-                            <input type="date" name="fecha_solicitud" value={formState.fecha_solicitud} onChange={handleInputChange} className={inputStyles} />
                         </div>
-                        <div>
-                            <label>Tipo de Permiso</label>
-                            <select name="tipo_permiso" value={formState.tipo_permiso} onChange={handleInputChange} className={inputStyles}>
-                                <option value="trabajo">Trabajo</option>
-                                <option value="personal">Personal</option>
-                                <option value="hora_almuerzo">Hora Almuerzo</option>
-                            </select>
-                        </div>
-                    </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label>Hora de Salida</label>
-                            <input type="time" name="hora_salida" value={formState.hora_salida} onChange={handleInputChange} className={inputStyles} />
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label>Hora de Salida</label>
+                                <input type="time" name="hora_salida" value={formState.hora_salida} onChange={handleInputChange} className={inputStyles} />
+                            </div>
+                            <div>
+                                <label>Hora de Regreso</label>
+                                <input type="time" name="hora_regreso" value={formState.hora_regreso} onChange={handleInputChange} className={inputStyles} />
+                            </div>
                         </div>
+
                         <div>
-                            <label>Hora de Regreso</label>
-                            <input type="time" name="hora_regreso" value={formState.hora_regreso} onChange={handleInputChange} className={inputStyles} />
+                            <label>Observación</label>
+                            <textarea name="observacion" value={formState.observacion} onChange={handleInputChange} rows={3} className={inputStyles}></textarea>
                         </div>
-                    </div>
 
-                    <div>
-                        <label>Observación</label>
-                        <textarea name="observacion" value={formState.observacion} onChange={handleInputChange} rows={3} className={inputStyles}></textarea>
-                    </div>
-
-                    <div className="flex justify-end mt-6">
-                        <button type="button" onClick={() => setIsModalOpen(false)} className="mr-3 px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 font-semibold">Cancelar</button>
-                        <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 font-semibold">Registrar Permiso</button>
-                    </div>
-                </form>
+                        <div className="flex justify-end mt-6">
+                            <button type="button" onClick={() => setIsModalOpen(false)} className="mr-3 px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 font-semibold">Cancelar</button>
+                            <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 font-semibold">Registrar Permiso</button>
+                        </div>
+                    </form>
+                </div>
             </Modal>
         </div>
     );

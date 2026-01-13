@@ -1,163 +1,118 @@
-/* Google Calendar-like Styles for React Big Calendar */
-
-.rbc-calendar {
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
-    background-color: white;
-    border: none !important;
-}
-
-/* Header */
-.rbc-toolbar {
-    margin-bottom: 20px;
-    padding: 0 10px;
-}
-
-.rbc-toolbar-label {
-    font-size: 1.5rem;
-    font-weight: 400;
-    color: #3c4043;
-    text-transform: capitalize;
-}
-
-.rbc-btn-group button {
-    border: none;
-    box-shadow: none;
-    background: white;
-    color: #5f6368;
-    font-weight: 500;
-    cursor: pointer;
-    border-radius: 4px;
-    padding: 8px 12px;
-}
-
-.rbc-btn-group button:hover {
-    background-color: #f1f3f4;
-}
-
-.rbc-btn-group button.rbc-active {
-    background-color: #e8f0fe;
-    color: #1967d2;
-    box-shadow: none;
-}
-
-/* Month View Grid */
-.rbc-month-view {
-    border: 1px solid #dadce0;
-    border-radius: 8px;
-    overflow: hidden;
-}
-
-.rbc-header {
-    border-bottom: 1px solid #dadce0;
-    padding: 10px 0;
-    font-size: 11px;
-    font-weight: 600;
-    color: #70757a;
-    text-transform: uppercase;
-    text-align: center;
-}
-
-.rbc-day-bg+.rbc-day-bg {
-    border-left: 1px solid #dadce0;
-}
-
-/* Hover effect for days */
-.rbc-day-bg:hover {
-    background-color: #f1f3f4;
-    cursor: pointer;
-    transition: background-color 0.2s ease;
-}
-
-.rbc-month-row+.rbc-month-row {
-    border-top: 1px solid #dadce0;
-}
-
-.rbc-date-cell {
-    padding: 8px;
-    font-size: 12px;
-    font-weight: 500;
-    text-align: center;
-    color: #3c4043;
-}
-
-/* Today's Date */
-.rbc-today .rbc-date-cell a {
-    /* The number is often in an anchor */
-    display: inline-block;
-    width: 28px;
-    height: 28px;
-    line-height: 28px;
-    background-color: #1a73e8;
-    box-shadow: 0 0 0 4px #d2e3fc;
-    /* Add a light blue shadow/ring */
-    color: white;
-    border-radius: 50%;
-}
-
-.rbc-today {
-    background-color: transparent !important;
-    /* Remove default gray bg */
-}
-
-.rbc-day-bg.rbc-today:hover {
-    background-color: #f1f3f4 !important;
-    cursor: pointer;
-}
-
-/* Events */
-.rbc-event {
-    background-color: #7986cb;
-    /* Google Calendar purple-ish blue */
-    border: none !important;
-    border-radius: 4px;
-    padding: 1px 2px !important;
-    /* Compact padding */
-    font-size: 11px !important;
-    line-height: 1.2;
-    min-height: 18px;
-    /* Force small height */
-    margin: 1px 2px !important;
-}
-
-
-/* Hide the default "dot" if RBC renders it for timed events in month view */
-.rbc-event-label {
-    display: none !important;
-}
-
-.rbc-event-content {
-    font-size: 12px;
-    font-weight: 500;
-}
-
-.rbc-event.rbc-selected {
-    background-color: #5c6bc0;
-}
-
-/* Event status colors overrides (if we want to keep status colors but cleaner) */
+/* Event Status Colors */
 .event-approved {
-    background-color: #33b679 !important;
-    /* Green */
+    background-color: #10b981 !important;
+    /* Green-500 */
+    color: white !important;
 }
 
 .event-pending {
-    background-color: #fbc02d !important;
-    /* Yellow */
+    background-color: #f59e0b !important;
+    /* Amber-500 */
     color: white !important;
-    /* White text per user request */
 }
 
 .event-cancelled {
-    background-color: #d50000 !important;
-    /* Red */
+    background-color: #ef4444 !important;
+    /* Red-500 */
+    color: white !important;
+    text-decoration: line-through;
 }
 
-/* Popover */
-.rbc-overlay {
-    z-index: 50;
-    background: white;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-    border-radius: 8px;
-    padding: 10px;
-    border: 1px solid #dadce0;
+/* Calendar Header Styling */
+.rbc-header {
+    text-transform: capitalize;
+    /* Ensure "Lunes" etc are capitalized */
+    padding: 8px 0 !important;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+/* Date Cell Styling - Centering */
+.rbc-date-cell {
+    padding-right: 0 !important;
+    /* Override default rbc padding */
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    padding-top: 4px !important;
+}
+
+/* Date Number Circle Styling */
+.date-number-circle {
+    display: inline-block;
+    width: 32px;
+    height: 32px;
+    line-height: 32px;
+    border-radius: 50%;
+    text-align: center;
+    cursor: pointer;
+    font-weight: 500;
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* Hover effect for ALL days (including today if desired, or exlcuding) */
+/* User asked for hover on "Any day when I approach" */
+.date-number-circle:hover {
+    background-color: #e5e7eb;
+    /* Gray-200 */
+    color: #1f2937;
+    /* Gray-800 */
+}
+
+/* Today style overrides */
+.date-number-circle.today {
+    background-color: #1a73e8;
+    color: white;
+    box-shadow: 0 0 0 4px #d2e3fc;
+    font-weight: bold;
+}
+
+/* Ensure hover on today doesn't ruin the blue background, or does it lighten it? 
+   Usually Google Calendar darkens the blue or keeps it. 
+   Let's keep the tool tip/focus but prevent gray background on today */
+.date-number-circle.today:hover {
+    background-color: #1557b0;
+    /* Darker blue */
+    color: white;
+}
+
+
+/* Print Styles */
+@media print {
+
+    /* Hide everything by default */
+    body * {
+        visibility: hidden;
+    }
+
+    /* Make printable area and its children visible */
+    .printable-area,
+    .printable-area * {
+        visibility: visible !important;
+    }
+
+    /* Position the printable area to the top left of the page */
+    .printable-area {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        margin: 0;
+        padding: 0;
+        background-color: white;
+        z-index: 99999;
+        /* Ensure it's on top */
+        display: block !important;
+        /* Ensure it's not hidden by 'hidden' class */
+    }
+
+    /* Hide standard page elements explicitly to avoid layout shifts or blank pages caused by them taking up space */
+    .no-print {
+        display: none !important;
+    }
+
+    @page {
+        size: auto;
+        margin: 0mm;
+    }
 }
