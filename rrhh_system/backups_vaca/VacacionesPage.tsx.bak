@@ -55,13 +55,11 @@ const VacacionesPage: React.FC = () => {
     const [vacacionGuardada, setVacacionGuardada] = useState<number | null>(null);
     const [antiguedadDetalle, setAntiguedadDetalle] = useState<string | null>(null);
     const [vacacionPorLey, setVacacionPorLey] = useState<number | null>(null);
-    const [saldoActual, setSaldoActual] = useState<number | null>(null);
-    const [saldoGuardadas, setSaldoGuardadas] = useState<number>(0);
-    const [saldoLey, setSaldoLey] = useState<number>(0);
     const [diasCalculados, setDiasCalculados] = useState<number>(0);
 
     const [employeeOptions, setEmployeeOptions] = useState<SelectOption[]>([]);
     const [selectedEmployeeOption, setSelectedEmployeeOption] = useState<SelectOption | null>(null);
+    const [saldoActual, setSaldoActual] = useState<number | null>(null);
 
     const canManage = user?.is_superuser || user?.groups.some(g => ['Admin', 'RRHH', 'Jefe de Departamento'].includes(g.name));
 
@@ -94,8 +92,6 @@ const VacacionesPage: React.FC = () => {
                 headers: { Authorization: `Token ${token}` }
             });
             setSaldoActual(res.data.saldo);
-            setSaldoGuardadas(res.data.saldo_guardadas);
-            setSaldoLey(res.data.saldo_ley);
             setFechaIngresoVigente(res.data.fecha_ingreso_vigente);
             setVacacionGuardada(res.data.dias_ganados);
             setAntiguedadDetalle(res.data.antiguedad_detalle);
@@ -103,8 +99,6 @@ const VacacionesPage: React.FC = () => {
         } catch (error) {
             console.error("Error fetching saldo", error);
             setSaldoActual(0);
-            setSaldoGuardadas(0);
-            setSaldoLey(0);
             setFechaIngresoVigente(null);
             setVacacionGuardada(0);
             setAntiguedadDetalle(null);
@@ -291,40 +285,14 @@ const VacacionesPage: React.FC = () => {
                             )}
 
                             {saldoActual !== null && (
-                                <div className="mb-4 space-y-3">
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="p-3 bg-indigo-50 rounded border border-indigo-100">
-                                            <p className="text-[10px] uppercase tracking-wider text-indigo-500 font-bold">Guardadas Actual</p>
-                                            <p className="text-lg font-bold text-indigo-700">{saldoGuardadas} d</p>
-                                        </div>
-                                        <div className="p-3 bg-blue-50 rounded border border-blue-100">
-                                            <p className="text-[10px] uppercase tracking-wider text-blue-500 font-bold">Por Ley Actual</p>
-                                            <p className="text-lg font-bold text-blue-700">{saldoLey} d</p>
-                                        </div>
+                                <div className="mb-4 grid grid-cols-2 gap-4">
+                                    <div className="p-3 bg-green-50 rounded border border-green-200">
+                                        <p className="text-sm text-green-800">Saldo Actual</p>
+                                        <p className="text-xl font-bold text-green-900">{saldoActual} días</p>
                                     </div>
-
-                                    {diasCalculados > 0 && (
-                                        <div className="bg-orange-50 p-3 rounded border border-orange-200 text-sm">
-                                            <p className="font-bold text-orange-800 mb-1">Proyección de Consumo:</p>
-                                            <div className="flex justify-between text-xs text-orange-700">
-                                                <span>De Guardadas:</span>
-                                                <span className="font-bold">-{Math.min(diasCalculados, saldoGuardadas)} días</span>
-                                            </div>
-                                            {diasCalculados > saldoGuardadas && (
-                                                <div className="flex justify-between text-xs text-orange-700">
-                                                    <span>De Vacación por Ley:</span>
-                                                    <span className="font-bold">-{diasCalculados - Math.min(diasCalculados, saldoGuardadas)} días</span>
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-
-                                    <div className="p-3 bg-green-50 rounded border border-green-200 flex justify-between items-center">
-                                        <div>
-                                            <p className="text-sm text-green-800 font-bold">Saldo Total Final</p>
-                                            <p className="text-xs text-green-600 italic">Guardadas + Ley - Consumo</p>
-                                        </div>
-                                        <p className="text-2xl font-black text-green-900">{(saldoActual - diasCalculados).toFixed(1)} <span className="text-sm font-normal">días</span></p>
+                                    <div className="p-3 bg-indigo-50 rounded border border-indigo-200">
+                                        <p className="text-sm text-indigo-800">Saldo Final (Est.)</p>
+                                        <p className="text-xl font-bold text-indigo-900">{(saldoActual - diasCalculados).toFixed(1)} días</p>
                                     </div>
                                 </div>
                             )}

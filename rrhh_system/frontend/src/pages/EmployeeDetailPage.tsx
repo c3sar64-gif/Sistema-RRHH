@@ -18,7 +18,7 @@ interface EmployeeData {
   fotocopia_luz_agua_gas?: string; croquis_domicilio?: string; fotocopia_licencia_conducir?: string;
   familiares: { nombre_completo: string; parentesco: string; celular: string; }[];
   estudios: { nivel: string; carrera: string; institucion: string; estado: string; }[];
-  contratos: { tipo_contrato: string; tipo_trabajador: string; contrato_fiscal: string; fecha_inicio: string; fecha_fin_pactada: string; salario_base: string; jornada_laboral: string; estado_contrato: string; observaciones: string; }[];
+  contratos: { id?: number; empleado?: number; tipo_contrato: string; tipo_trabajador: string; contrato_fiscal: string; fecha_inicio: string; fecha_fin_pactada: string; salario_base: string; jornada_laboral: string; estado_contrato: string; observaciones: string; }[];
 }
 
 interface SolicitudVacacion {
@@ -216,8 +216,11 @@ export const EmployeeDetailPage: React.FC = () => {
             <h3 className="text-xl font-bold text-gray-700 mb-6 print:mb-2 border-b pb-2">Contratos</h3>
             <div className="space-y-3">
               {employee.contratos.length === 0 ? <p className="text-sm text-gray-500 italic">Sin contratos.</p> : employee.contratos.map((c, i) => (
-                <div key={i} className="text-sm border rounded p-2 hover:bg-gray-50">
-                  <p className="font-semibold text-indigo-700">{c.tipo_contrato}</p>
+                <div key={i} className="text-sm border rounded p-2 hover:bg-gray-50 relative">
+                  <div className="flex justify-between items-start">
+                    <p className="font-semibold text-indigo-700">{c.tipo_contrato}</p>
+                    <span className="text-xs font-mono text-gray-400">{c.id}-{c.empleado}</span>
+                  </div>
                   <p className="text-xs text-gray-600">Estado: {c.estado_contrato}</p>
                   <p className="text-xs text-gray-500">Del {c.fecha_inicio} al {c.fecha_fin_pactada}</p>
                   <p className="text-xs text-gray-800 font-bold mt-1">Salario: {c.salario_base}</p>
@@ -254,7 +257,7 @@ export const EmployeeDetailPage: React.FC = () => {
                       <td className="px-4 py-2 text-sm text-gray-900">{v.dias_calculados} {v.es_medio_dia ? '(0.5)' : ''}</td>
                       <td className="px-4 py-2 text-sm">
                         <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${v.estado === 'aprobado' ? 'bg-green-100 text-green-700' :
-                            v.estado === 'anulado' ? 'bg-gray-100 text-gray-700' : 'bg-yellow-100 text-yellow-700'
+                          v.estado === 'anulado' ? 'bg-gray-100 text-gray-700' : 'bg-yellow-100 text-yellow-700'
                           }`}>
                           {v.estado.toUpperCase()}
                         </span>
@@ -291,7 +294,7 @@ export const EmployeeDetailPage: React.FC = () => {
                       <td className="px-4 py-2 text-sm text-gray-900 font-mono text-[10px]">{p.hora_salida} - {p.hora_regreso}</td>
                       <td className="px-4 py-2 text-sm">
                         <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${p.estado === 'aprobado' ? 'bg-green-100 text-green-700' :
-                            p.estado === 'rechazado' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'
+                          p.estado === 'rechazado' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'
                           }`}>
                           {p.estado.toUpperCase()}
                         </span>

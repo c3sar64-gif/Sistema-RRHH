@@ -3,7 +3,7 @@ from django.db import transaction
 from django.contrib.auth.models import User, Group
 from .models import (
     Empleado, Departamento, Cargo, Familiar, Estudio, Contrato, Permiso, HoraExtra,
-    VacacionPeriodo, SolicitudVacacion, VacacionMovimiento, VacacionGuardada
+    SolicitudVacacion, VacacionGuardada
 )
 
 class GroupSerializer(serializers.ModelSerializer):
@@ -63,20 +63,23 @@ class UserCreateSerializer(serializers.ModelSerializer):
 # First, define the serializers for the nested models.
 
 class FamiliarSerializer(serializers.ModelSerializer):
+    id = serializers.IntegerField(required=False, read_only=False, allow_null=True)
     class Meta:
         model = Familiar
         fields = ['id', 'nombre_completo', 'parentesco', 'celular', 'fecha_nacimiento', 'activo']
 
 class EstudioSerializer(serializers.ModelSerializer):
+    id = serializers.IntegerField(required=False, read_only=False, allow_null=True)
     class Meta:
         model = Estudio
         fields = ['id', 'nivel', 'carrera', 'institucion', 'estado', 'activo']
 
 class ContratoSerializer(serializers.ModelSerializer):
+    id = serializers.IntegerField(required=False, read_only=False, allow_null=True)
     class Meta:
         model = Contrato
         fields = [
-            'id', 'tipo_contrato', 'tipo_trabajador', 'contrato_fiscal', 
+            'id', 'empleado', 'tipo_contrato', 'tipo_trabajador', 'contrato_fiscal', 
             'fecha_inicio', 'fecha_fin', 'fecha_fin_pactada', 'salario_base',
             'jornada_laboral', 'estado_contrato', 'observaciones'
         ]
@@ -170,12 +173,15 @@ class EmpleadoSerializer(serializers.ModelSerializer):
             empleado.save()
 
         for familiar_data in familiares_data:
+            familiar_data.pop('id', None)
             Familiar.objects.create(empleado=empleado, **familiar_data)
         
         for estudio_data in estudios_data:
+            estudio_data.pop('id', None)
             Estudio.objects.create(empleado=empleado, **estudio_data)
 
         for contrato_data in contratos_data:
+            contrato_data.pop('id', None)
             Contrato.objects.create(empleado=empleado, **contrato_data)
 
         return empleado
@@ -200,43 +206,50 @@ class EmpleadoSerializer(serializers.ModelSerializer):
         instance = super().update(instance, validated_data)
 
         # Assign and save file fields if they were provided in the update
-        if foto_file:
-            instance.foto = foto_file
-        if fotocopia_ci_file:
-            instance.fotocopia_ci = fotocopia_ci_file
-        if curriculum_vitae_file:
-            instance.curriculum_vitae = curriculum_vitae_file
-        if certificado_antecedentes_file:
-            instance.certificado_antecedentes = certificado_antecedentes_file
-        if fotocopia_luz_agua_gas_file:
-            instance.fotocopia_luz_agua_gas = fotocopia_luz_agua_gas_file
-        if croquis_domicilio_file:
-            instance.croquis_domicilio = croquis_domicilio_file
-        if fotocopia_licencia_conducir_file:
-            instance.fotocopia_licencia_conducir = fotocopia_licencia_conducir_file
+        if foto_file: instance.foto = foto_file
+        if fotocopia_ci_file: instance.fotocopia_ci = fotocopia_ci_file
+        if curriculum_vitae_file: instance.curriculum_vitae = curriculum_vitae_file
+        if certificado_antecedentes_file: instance.certificado_antecedentes = certificado_antecedentes_file
+        if fotocopia_luz_agua_gas_file: instance.fotocopia_luz_agua_gas = fotocopia_luz_agua_gas_file
+        if croquis_domicilio_file: instance.croquis_domicilio = croquis_domicilio_file
+        if fotocopia_licencia_conducir_file: instance.fotocopia_licencia_conducir = fotocopia_licencia_conducir_file
         
         # Save again if any file fields were assigned/updated
         if any([foto_file, fotocopia_ci_file, curriculum_vitae_file, certificado_antecedentes_file, fotocopia_luz_agua_gas_file, croquis_domicilio_file, fotocopia_licencia_conducir_file]):
             instance.save() 
 
-        # Handle nested updates. This is a simple implementation: delete old and create new.
-        # A more complex implementation would update existing objects by ID.
-        if familiares_data is not None:
-            instance.familiares.all().delete()
-            for familiar_data in familiares_data:
-                Familiar.objects.create(empleado=instance, **familiar_data)
+        # Handle nested updates with a robust "update or create" logic
+        def update_nested_collection(collection, data_list, model_class):
+            if data_list is None: return
+            
+            existing_items = {item.id: item for item in collection.all()}
+            keep_ids = []
+            
+            for data in data_list:
+                item_id = data.get('id')
+                # Remove id from data to avoid IntegrityError if we try to set it during create
+                # or redundancy during update
+                clean_data = {k: v for k, v in data.items() if k != 'id'}
+                
+                if item_id and item_id in existing_items:
+                    # Update existing record
+                    item = existing_items[item_id]
+                    for attr, value in clean_data.items():
+                        setattr(item, attr, value)
+                    item.save()
+                    keep_ids.append(item_id)
+                else:
+                    # Create new record
+                    new_item = model_class.objects.create(empleado=instance, **clean_data)
+                    keep_ids.append(new_item.id)
+            
+            # Remove orphans
+            collection.exclude(id__in=keep_ids).delete()
 
-        if estudios_data is not None:
-            instance.estudios.all().delete()
-            for estudio_data in estudios_data:
-                Estudio.objects.create(empleado=instance, **estudio_data)
-
-        if contratos_data is not None:
-            instance.contratos.all().delete()
-            for contrato_data in contratos_data:
-                Contrato.objects.create(empleado=instance, **contrato_data)
+        update_nested_collection(instance.familiares, familiares_data, Familiar)
+        update_nested_collection(instance.estudios, estudios_data, Estudio)
+        update_nested_collection(instance.contratos, contratos_data, Contrato)
         
-        # This instance.save() was already here, keep it for other non-file field updates
         instance.save() 
         return instance
 
@@ -293,38 +306,27 @@ class HoraExtraSerializer(serializers.ModelSerializer):
             'comentario_aprobador',
         ]
 
-class VacacionPeriodoSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = VacacionPeriodo
-        fields = '__all__'
-
-class VacacionMovimientoSerializer(serializers.ModelSerializer):
-    solicitud_detalle = serializers.SerializerMethodField()
-    
-    class Meta:
-        model = VacacionMovimiento
-        fields = '__all__'
-    
-    def get_solicitud_detalle(self, obj):
-        if obj.solicitud:
-            return f"{obj.solicitud.fecha_inicio} a {obj.solicitud.fecha_fin}"
-        return None
-
 class SolicitudVacacionSerializer(serializers.ModelSerializer):
     empleado_info = JefeSerializer(source='empleado', read_only=True)
     aprobador_info = JefeSerializer(source='aprobador', read_only=True)
     departamento_nombre = serializers.CharField(source='empleado.departamento.nombre', read_only=True, allow_null=True)
     contrato_nombre = serializers.SerializerMethodField()
+    contrato_identificador = serializers.SerializerMethodField()
 
     class Meta:
         model = SolicitudVacacion
         fields = '__all__'
-        read_only_fields = ['dias_calculados', 'fecha_solicitud', 'estado', 'fecha_aprobacion', 'comentario_aprobador', 'empleado_info', 'aprobador_info', 'departamento_nombre', 'contrato_nombre']
+        read_only_fields = ['dias_calculados', 'fecha_solicitud', 'estado', 'fecha_aprobacion', 'comentario_aprobador', 'empleado_info', 'aprobador_info', 'departamento_nombre', 'contrato_nombre', 'contrato_identificador']
     
     def get_contrato_nombre(self, obj):
         if obj.contrato:
             return f"Contrato {obj.contrato.fecha_inicio} al {obj.contrato.fecha_fin or 'Presente'}"
         return None
+
+    def get_contrato_identificador(self, obj):
+        if obj.contrato:
+            return f"{obj.contrato.id}-{obj.empleado.id}"
+        return f"Sin contrato-{obj.empleado.id}"
 
 class VacacionGuardadaSerializer(serializers.ModelSerializer):
     empleado_nombre = serializers.SerializerMethodField()

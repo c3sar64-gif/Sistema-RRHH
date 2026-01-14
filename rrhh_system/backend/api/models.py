@@ -120,13 +120,9 @@ class Contrato(models.Model):
     jornada_laboral = models.CharField(max_length=20, choices=JORNADA_LABORAL_CHOICES)
 
     estado_contrato = models.CharField(max_length=20, choices=ESTADO_CONTRATO_CHOICES, default='vigente')
-
     observaciones = models.TextField(blank=True, null=True)
 
-
-
     def __str__(self):
-
         return f'Contrato {self.get_tipo_contrato_display()} para {self.empleado} ({self.fecha_inicio})'
 
 # --- Choices for Permiso ---
@@ -184,15 +180,6 @@ class HoraExtra(models.Model):
 
 # --- Vacaciones Models ---
 
-class VacacionPeriodo(models.Model):
-    empleado = models.ForeignKey(Empleado, on_delete=models.CASCADE, related_name='periodos_vacacion')
-    fecha_inicio = models.DateField(help_text="Fecha de inicio del contrato o ciclo")
-    fecha_fin = models.DateField(null=True, blank=True, help_text="Fecha fin del contrato o renovación")
-    activo = models.BooleanField(default=True)
-
-    def __str__(self):
-        return f"Periodo {self.fecha_inicio} - {self.empleado}"
-
 class SolicitudVacacion(models.Model):
     ESTADO_CHOICES = [
         ('aprobado', 'Aprobado'),
@@ -214,28 +201,6 @@ class SolicitudVacacion(models.Model):
 
     def __str__(self):
         return f"Vacación {self.dias_calculados} días - {self.empleado}"
-
-class VacacionMovimiento(models.Model):
-    TIPO_CHOICES = [
-        ('inicio_contrato', 'Inicio/Renovación Contrato'),
-        ('acumulacion_anual', 'Acumulación Anual'),
-        ('consumo', 'Consumo (Solicitud)'),
-        ('pago', 'Pago en Efectivo'),
-        ('ajuste', 'Ajuste Manual'),
-        ('traspaso', 'Traspaso de Saldo'),
-    ]
-
-    empleado = models.ForeignKey(Empleado, on_delete=models.CASCADE, related_name='movimientos_vacacion')
-    periodo = models.ForeignKey('VacacionPeriodo', on_delete=models.CASCADE, related_name='movimientos')
-    contrato = models.ForeignKey('Contrato', on_delete=models.SET_NULL, null=True, blank=True, related_name='movimientos_vacacion')
-    fecha = models.DateField(auto_now_add=True)
-    tipo = models.CharField(max_length=50, choices=TIPO_CHOICES)
-    dias = models.DecimalField(max_digits=6, decimal_places=2, help_text="Valor positivo aumenta saldo, negativo resta")
-    solicitud = models.ForeignKey(SolicitudVacacion, on_delete=models.SET_NULL, null=True, blank=True, related_name='movimientos')
-    detalle = models.CharField(max_length=255, blank=True, null=True)
-
-    def __str__(self):
-        return f"{self.tipo} ({self.dias}) - {self.empleado}"
 
 class VacacionGuardada(models.Model):
     empleado = models.ForeignKey(Empleado, on_delete=models.CASCADE, related_name='vacaciones_guardadas_list')

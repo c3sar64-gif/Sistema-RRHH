@@ -339,30 +339,15 @@ class SolicitudVacacionViewSet(viewsets.ModelViewSet):
             elif anios >= 1: vacacion_ley = 15
             else: vacacion_ley = 0
 
-        # Tiered Consumption Logic
-        total_consumidos = float(consumidos)
-        totales_guardadas = float(ganados)
-        totales_ley = float(vacacion_ley)
-
-        # 1. Consume from Guardadas first
-        consumo_desde_guardadas = min(total_consumidos, totales_guardadas)
-        saldo_guardadas = totales_guardadas - consumo_desde_guardadas
-        
-        # 2. Consume leftover from Ley
-        consumo_restante = total_consumidos - consumo_desde_guardadas
-        saldo_ley = totales_ley - consumo_restante
-
         antiguedad_str = f"{anios} años, {meses} meses, {dias} días"
 
         return Response({
-            'saldo': saldo_guardadas + saldo_ley, # Total consolidated balance
-            'saldo_guardadas': saldo_guardadas,
-            'saldo_ley': saldo_ley,
-            'dias_ganados': totales_guardadas,
-            'dias_consumidos': total_consumidos,
+            'saldo': (float(ganados) + float(vacacion_ley)) - float(consumidos),
+            'dias_ganados': float(ganados),
+            'dias_consumidos': float(consumidos),
             'fecha_ingreso_vigente': empleado.fecha_ingreso_vigente,
             'antiguedad_detalle': antiguedad_str,
-            'vacacion_por_ley': totales_ley
+            'vacacion_por_ley': float(vacacion_ley)
         })
 
     def perform_create(self, serializer):

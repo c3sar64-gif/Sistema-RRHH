@@ -4,7 +4,7 @@ from .views import (
     UserCreate, EmpleadoViewSet, DepartamentoViewSet, CargoViewSet,
     FamiliarViewSet, EstudioViewSet, ContratoViewSet, get_current_user, UserViewSet,
     JefesDepartamentoListView, PermisoViewSet, HoraExtraViewSet,
-    VacacionPeriodoViewSet, SolicitudVacacionViewSet, VacacionMovimientoViewSet, VacacionGuardadaViewSet
+    SolicitudVacacionViewSet, VacacionGuardadaViewSet
 )
 
 # Create a router and register our viewsets with it.
@@ -18,9 +18,7 @@ router.register(r'estudios', EstudioViewSet)
 router.register(r'contratos', ContratoViewSet)
 router.register(r'permisos', PermisoViewSet)
 router.register(r'horas-extras', HoraExtraViewSet, basename='horas-extras')
-router.register(r'vacaciones-periodos', VacacionPeriodoViewSet)
 router.register(r'vacaciones-solicitudes', SolicitudVacacionViewSet)
-router.register(r'vacaciones-movimientos', VacacionMovimientoViewSet)
 router.register(r'vacaciones-guardadas', VacacionGuardadaViewSet)
 
 # The API URLs are now determined automatically by the router.

@@ -10,7 +10,7 @@ interface Option { id: number; nombre: string; }
 interface EmpleadoSimple { id: number; nombres: string; apellido_paterno: string; apellido_materno?: string; nombre: string; }
 interface Familiar { id?: number; nombre_completo: string; parentesco: string; celular: string; fecha_nacimiento?: string; }
 interface Estudio { id?: number; nivel: string; carrera: string; institucion: string; estado: string; }
-interface Contrato { id?: number; tipo_contrato: string; tipo_trabajador: string; contrato_fiscal: string; fecha_inicio: string; fecha_fin_pactada: string; salario_base: string; jornada_laboral: string; estado_contrato: string; observaciones: string; }
+interface Contrato { id?: number; empleado?: number; tipo_contrato: string; tipo_trabajador: string; contrato_fiscal: string; fecha_inicio: string; fecha_fin: string; fecha_fin_pactada: string; salario_base: string; jornada_laboral: string; estado_contrato: string; observaciones: string; }
 
 // Extend the employee data type to include the new foto field
 interface EmployeeData {
@@ -84,6 +84,21 @@ export const EmployeeFormPage: React.FC = () => {
     fetchData();
   }, [id, isEditing, token]);
 
+  useEffect(() => {
+    const vigenteContract = employeeData.contratos.find(c => c.estado_contrato === 'vigente');
+    let targetDate = employeeData.fecha_ingreso_vigente;
+
+    if (vigenteContract && vigenteContract.fecha_inicio) {
+      targetDate = vigenteContract.fecha_inicio;
+    } else {
+      targetDate = employeeData.fecha_ingreso_inicial;
+    }
+
+    if (targetDate !== employeeData.fecha_ingreso_vigente) {
+      setEmployeeData(prev => ({ ...prev, fecha_ingreso_vigente: targetDate }));
+    }
+  }, [employeeData.contratos, employeeData.fecha_ingreso_inicial, employeeData.fecha_ingreso_vigente]);
+
   const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
     let processedValue: any = value;
@@ -111,6 +126,24 @@ export const EmployeeFormPage: React.FC = () => {
   };
   const addNestedItem = (section: 'familiares' | 'estudios' | 'contratos', defaultItem: any) => { setEmployeeData(prev => ({ ...prev, [section]: [...(prev as any)[section], defaultItem] })); };
   const removeNestedItem = (index: number, section: 'familiares' | 'estudios' | 'contratos') => { setEmployeeData(prev => ({ ...prev, [section]: (prev as any)[section].filter((_: any, i: number) => i !== index) })); };
+  const addContract = () => {
+    const updatedContracts = employeeData.contratos.map(c => (
+      c.estado_contrato === 'vigente' ? { ...c, estado_contrato: 'finalizado' } : c
+    ));
+    const newContract: Contrato = {
+      tipo_contrato: 'plazo_fijo',
+      tipo_trabajador: 'permanente',
+      contrato_fiscal: 'avicola',
+      fecha_inicio: new Date().toISOString().split('T')[0],
+      fecha_fin: '',
+      fecha_fin_pactada: '',
+      salario_base: '',
+      jornada_laboral: 'tiempo_completo',
+      estado_contrato: 'vigente',
+      observaciones: '',
+    };
+    setEmployeeData(prev => ({ ...prev, contratos: [...updatedContracts, newContract] }));
+  };
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -603,6 +636,9 @@ export const EmployeeFormPage: React.FC = () => {
         <h3 className="text-lg font-semibold text-gray-600 mb-4">Contratos</h3>
         {employeeData.contratos.map((con, i) => (
           <div key={i} className="border p-4 rounded-md mb-4 space-y-4 relative">
+            <div className="absolute top-2 right-10 text-xs font-mono text-gray-400">
+              {con.id ? `${con.id}-${con.empleado}` : 'Nuevo'}
+            </div>
             <button type="button" onClick={() => removeNestedItem(i, 'contratos')} className="absolute top-2 right-2 text-red-500 p-2 font-bold hover:bg-red-100 rounded-full leading-none">X</button>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
@@ -729,7 +765,7 @@ export const EmployeeFormPage: React.FC = () => {
             </div>
           </div>
         ))}
-        <button type="button" onClick={() => addNestedItem('contratos', { tipo_contrato: 'indefinido', tipo_trabajador: 'permanente', contrato_fiscal: 'avicola', fecha_inicio: '', fecha_fin_pactada: '', salario_base: '0', jornada_laboral: 'tiempo_completo', estado_contrato: 'vigente', observaciones: '' })} className="text-indigo-600 text-sm font-semibold">+ Añadir Contrato</button>
+        <button type="button" onClick={addContract} className="text-indigo-600 text-sm font-semibold">+ Añadir Contrato</button>
       </div>
       <div className="bg-white p-6 rounded-lg shadow-md">
         <h2 className="text-xl font-bold text-gray-700 mb-6 border-b pb-2">5. Documentos y Foto</h2>
