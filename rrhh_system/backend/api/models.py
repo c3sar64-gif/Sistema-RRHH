@@ -207,6 +207,7 @@ class VacacionGuardada(models.Model):
     contrato = models.ForeignKey('Contrato', on_delete=models.SET_NULL, null=True, blank=True, related_name='vacaciones_guardadas')
     dias = models.DecimalField(max_digits=5, decimal_places=1)
     gestion = models.CharField(max_length=50, blank=True, null=True, help_text="Gestión o motivo (ej. 2022-2023)")
+    fecha = models.DateField(null=True, blank=True, help_text="Fecha a la que corresponde el movimiento")
     fecha_creacion = models.DateField(auto_now_add=True)
     
     def __str__(self):

@@ -297,73 +297,157 @@ class SolicitudVacacionViewSet(viewsets.ModelViewSet):
             if not hasattr(user, 'empleado'): return Response({'saldo': 0.0})
             empleado = user.empleado
 
-        ganados = VacacionGuardada.objects.filter(empleado=empleado).aggregate(t=models.Sum('dias'))['t'] or 0.0
-        consumidos = SolicitudVacacion.objects.filter(empleado=empleado, estado='aprobado').aggregate(t=models.Sum('dias_calculados'))['t'] or 0.0
+        # --- FILTERS BY VIGENTE ---
+        filters_g = {'empleado': empleado}
+        filters_s = {'empleado': empleado, 'estado': 'aprobado'}
+        start_date = empleado.fecha_ingreso_vigente
+        if start_date:
+             filters_g['fecha__gte'] = start_date
+             filters_s['fecha_inicio__gte'] = start_date
+
+        ganados_objs = VacacionGuardada.objects.filter(**filters_g).order_by('fecha', 'id')
+        consumidos_objs = SolicitudVacacion.objects.filter(**filters_s).order_by('fecha_inicio', 'id')
         
-        # Antiquity and Law Calculation
+        # Antiquity and Law (Cumulative)
         anios, meses, dias = 0, 0, 0
-        vacacion_ley = 0
-        if empleado.fecha_ingreso_vigente:
-            from datetime import date
+        total_ley_acumulado = 0
+        entries = []
+        
+        if start_date:
+            from datetime import date, timedelta
             today = date.today()
-            start = empleado.fecha_ingreso_vigente
-            diff = today - start
-            
-            # Simple but robust Y, M, D
-            anios = today.year - start.year
-            if (today.month, today.day) < (start.month, start.day):
-                anios -= 1
-            
-            # Months
-            temp_date = date(start.year + anios, start.month, start.day)
-            meses = (today.year - temp_date.year) * 12 + today.month - temp_date.month
-            if today.day < temp_date.day:
-                meses -= 1
-            
-            # Days (approx)
-            # To get exact days, we add the years and months to start date
-            # But let's keep it simple as requested
             from dateutil.relativedelta import relativedelta
             try:
-                rd = relativedelta(today, start)
+                rd = relativedelta(today, start_date)
                 anios, meses, dias = rd.years, rd.months, rd.days
-            except ImportError:
-                # Fallback if relativedelta not available
-                dias = (today - (temp_date + relativedelta(months=meses))).days # This still needs relativedelta
-                # If not available, we use the simple subtraction for years and months already done.
-                pass
+            except:
+                anios = today.year - start_date.year
+                if (today.month, today.day) < (start_date.month, start_date.day): anios -= 1
 
-            # Law scale: 1-5: 15, 5-10: 20, 10+: 30
-            if anios >= 10: vacacion_ley = 30
-            elif anios >= 5: vacacion_ley = 20
-            elif anios >= 1: vacacion_ley = 15
-            else: vacacion_ley = 0
+            # 1. Virtual entries for anniversaries (Law)
+            for i in range(1, anios + 1):
+                f_anniv = start_date + relativedelta(years=i)
+                if i >= 11: d_ley = 30
+                elif i >= 6: d_ley = 20
+                else: d_ley = 15
+                total_ley_acumulado += d_ley
+                entries.append({
+                    'fecha': f_anniv,
+                    'tipo': 'Leyes Sociales',
+                    'incidencia': f'Aniversario {i} años',
+                    'dias': float(d_ley),
+                    'contrato': f"Ciclo {start_date}"
+                })
 
-        # Tiered Consumption Logic
-        total_consumidos = float(consumidos)
-        totales_guardadas = float(ganados)
-        totales_ley = float(vacacion_ley)
+        # 2. Real entries (Guardadas)
+        for g in ganados_objs:
+            entries.append({
+                'fecha': g.fecha or g.fecha_creacion,
+                'tipo': 'Guardadas/Abono',
+                'incidencia': g.gestion or 'Carga Manual',
+                'dias': float(g.dias),
+                'contrato': f"ID-{g.contrato.id if g.contrato else 'S/C'}"
+            })
 
-        # 1. Consume from Guardadas first
-        consumo_desde_guardadas = min(total_consumidos, totales_guardadas)
-        saldo_guardadas = totales_guardadas - consumo_desde_guardadas
+        # 3. Consumo entries
+        for s in consumidos_objs:
+            entries.append({
+                'fecha': s.fecha_inicio,
+                'tipo': 'Consumo',
+                'incidencia': s.observacion or 'Vacaciones tomadas',
+                'dias': -float(s.dias_calculados),
+                'contrato': f"ID-{s.contrato.id if s.contrato else 'S/C'}"
+            })
+
+        # --- SORT AND COMPUTE RUNNING BALANCE ---
+        # Sort by date, then by type (give positive entries priority on same day if needed, but simple date sort first)
+        entries.sort(key=lambda x: x['fecha'])
         
-        # 2. Consume leftover from Ley
-        consumo_restante = total_consumidos - consumo_desde_guardadas
-        saldo_ley = totales_ley - consumo_restante
+        running = 0.0
+        historial = []
+        
+        # Track totals for breakdown
+        total_ganados_guardadas = 0.0
+        total_ley_acumulado_final = 0.0
+        total_consumido_historial = 0.0
 
-        antiguedad_str = f"{anios} años, {meses} meses, {dias} días"
+        for e in entries:
+            saldo_anterior = running
+            running += e['dias']
+            e['saldo_anterior'] = round(saldo_anterior, 1)
+            e['saldo_actual'] = round(running, 1)
+            historial.append(e)
+
+            if e['dias'] > 0:
+                if e['tipo'] == 'Leyes Sociales':
+                    total_ley_acumulado_final += e['dias']
+                else:
+                    total_ganados_guardadas += e['dias']
+            else:
+                total_consumido_historial += abs(e['dias'])
+
+        # Tiered consumption for breakdown display (Guardadas first, then Ley)
+        # This logic matches the original requirement: consume from Guardadas first
+        consumo_desde_guardadas = min(total_consumido_historial, total_ganados_guardadas)
+        saldo_guardadas = total_ganados_guardadas - consumo_desde_guardadas
+        
+        consumo_restante = total_consumido_historial - consumo_desde_guardadas
+        saldo_ley = total_ley_acumulado_final - consumo_restante
 
         return Response({
-            'saldo': saldo_guardadas + saldo_ley, # Total consolidated balance
-            'saldo_guardadas': saldo_guardadas,
-            'saldo_ley': saldo_ley,
-            'dias_ganados': totales_guardadas,
-            'dias_consumidos': total_consumidos,
-            'fecha_ingreso_vigente': empleado.fecha_ingreso_vigente,
-            'antiguedad_detalle': antiguedad_str,
-            'vacacion_por_ley': totales_ley
+            'saldo': round(running, 1),
+            'saldo_guardadas': round(saldo_guardadas, 1),
+            'saldo_ley': round(saldo_ley, 1),
+            'dias_ganados': round(total_ganados_guardadas, 1), # Only manual/saved entries
+            'historial': historial,
+            'antiguedad_detalle': f"{anios} años, {meses} meses, {dias} días",
+            'fecha_ingreso_vigente': start_date,
+            'vacacion_por_ley': total_ley_acumulado # Total accrued law days
         })
+
+    @action(detail=False, methods=['post'])
+    def liquidar(self, request):
+        if not (request.user.is_superuser or request.user.groups.filter(name__in=['Admin', 'RRHH']).exists()):
+            return Response({'error': 'No tienes permiso.'}, status=403)
+            
+        data = request.data
+        empleado_id = data.get('empleado_id')
+        nueva_fecha = data.get('nueva_fecha')
+        dias_pagar = float(data.get('dias_pagar', 0))
+        dias_guardar = float(data.get('dias_guardar', 0))
+
+        try:
+            empleado = Empleado.objects.get(pk=empleado_id)
+        except Empleado.DoesNotExist:
+            return Response({'error': 'Empleado no existe.'}, status=404)
+
+        from datetime import datetime, timedelta
+        nueva_dt = datetime.strptime(nueva_fecha, '%Y-%m-%d').date()
+        fecha_cierre = nueva_dt - timedelta(days=1)
+
+        with transaction.atomic():
+            # 1. Cierre (negativos)
+            if dias_pagar > 0:
+                VacacionGuardada.objects.create(
+                    empleado=empleado, dias=-dias_pagar, 
+                    fecha=fecha_cierre, gestion="Vacaciones Pagadas (Cierre)"
+                )
+            if dias_guardar > 0:
+                VacacionGuardada.objects.create(
+                    empleado=empleado, dias=-dias_guardar, 
+                    fecha=fecha_cierre, gestion="Traspaso (Salida)"
+                )
+                # 2. Apertura
+                VacacionGuardada.objects.create(
+                    empleado=empleado, dias=dias_guardar, 
+                    fecha=nueva_dt, gestion="Saldo Inicial (Traspaso)"
+                )
+            
+            # 3. Reset
+            empleado.fecha_ingreso_vigente = nueva_dt
+            empleado.save()
+
+        return Response({'status': 'ok'})
 
     def perform_create(self, serializer):
         data = self.request.data

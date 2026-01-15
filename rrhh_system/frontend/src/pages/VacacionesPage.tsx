@@ -62,6 +62,11 @@ const VacacionesPage: React.FC = () => {
 
     const [employeeOptions, setEmployeeOptions] = useState<SelectOption[]>([]);
     const [selectedEmployeeOption, setSelectedEmployeeOption] = useState<SelectOption | null>(null);
+    const [historial, setHistorial] = useState<any[]>([]);
+    const [showLiquidarModal, setShowLiquidarModal] = useState(false);
+    const [nuevaFecha, setNuevaFecha] = useState(moment().format('YYYY-MM-DD'));
+    const [diasPagar, setDiasPagar] = useState<number>(0);
+    const [diasGuardar, setDiasGuardar] = useState<number>(0);
 
     const canManage = user?.is_superuser || user?.groups.some(g => ['Admin', 'RRHH', 'Jefe de Departamento'].includes(g.name));
 
@@ -94,6 +99,7 @@ const VacacionesPage: React.FC = () => {
                 headers: { Authorization: `Token ${token}` }
             });
             setSaldoActual(res.data.saldo);
+            setHistorial(res.data.historial || []);
             setSaldoGuardadas(res.data.saldo_guardadas);
             setSaldoLey(res.data.saldo_ley);
             setFechaIngresoVigente(res.data.fecha_ingreso_vigente);
@@ -189,6 +195,28 @@ const VacacionesPage: React.FC = () => {
         }
     };
 
+    const handleLiquidar = async (e: React.FormEvent) => {
+        e.preventDefault();
+        const empId = selectedEmployeeOption?.id;
+        if (!empId) { alert("Debe seleccionar un empleado."); return; }
+        if (!window.confirm("¿Confirmar liquidación? Se creará un nuevo ciclo y se registrarán los pagos/traspasos.")) return;
+
+        try {
+            await axios.post('http://127.0.0.1:8000/api/vacaciones-solicitudes/liquidar/', {
+                empleado_id: empId,
+                nueva_fecha: nuevaFecha,
+                dias_pagar: diasPagar,
+                dias_guardar: diasGuardar
+            }, { headers: { Authorization: `Token ${token}` } });
+            setShowLiquidarModal(false);
+            fetchData();
+            fetchSaldo(Number(empId));
+            alert("Liquidación exitosa y nuevo ciclo iniciado.");
+        } catch (error: any) {
+            alert(error.response?.data?.error || "Error al procesar liquidación.");
+        }
+    };
+
     const handleAction = async (id: number, action: string) => {
         if (!window.confirm(`¿Está seguro de ${action} esta solicitud?`)) return;
         try {
@@ -238,6 +266,11 @@ const VacacionesPage: React.FC = () => {
                             Vacaciones Guardadas
                         </button>
                     )}
+                    {canManage && (
+                        <button onClick={() => setShowLiquidarModal(true)} className="bg-orange-600 text-white px-4 py-2 rounded-md hover:bg-orange-700 transition shadow mr-4">
+                            🔄 Renovar / Liquidar
+                        </button>
+                    )}
                     <button onClick={() => { resetForm(); setShowModal(true); }} className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition shadow">
                         + Nueva Solicitud
                     </button>
@@ -257,6 +290,7 @@ const VacacionesPage: React.FC = () => {
                     messages={{ next: "Siguiente", previous: "Anterior", today: "Hoy", month: "Mes", week: "Semana", day: "Día" }}
                     eventPropGetter={eventStyleGetter}
                     onSelectEvent={(event) => { setSelectedEvent(event.resource); setShowListModal(true); }}
+                    onNavigate={(date) => { /* opcional: actualizar algo al cambiar mes */ }}
                 />
             </div>
 
@@ -295,11 +329,11 @@ const VacacionesPage: React.FC = () => {
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="p-3 bg-indigo-50 rounded border border-indigo-100">
                                             <p className="text-[10px] uppercase tracking-wider text-indigo-500 font-bold">Guardadas Actual</p>
-                                            <p className="text-lg font-bold text-indigo-700">{saldoGuardadas} d</p>
+                                            <p className="text-lg font-bold text-indigo-700">{saldoGuardadas || 0} d</p>
                                         </div>
                                         <div className="p-3 bg-blue-50 rounded border border-blue-100">
                                             <p className="text-[10px] uppercase tracking-wider text-blue-500 font-bold">Por Ley Actual</p>
-                                            <p className="text-lg font-bold text-blue-700">{saldoLey} d</p>
+                                            <p className="text-lg font-bold text-blue-700">{saldoLey || 0} d</p>
                                         </div>
                                     </div>
 
@@ -392,27 +426,42 @@ const VacacionesPage: React.FC = () => {
                                 </div>
                             ) : (
                                 <table className="min-w-full divide-y divide-gray-200">
-                                    <thead className="bg-gray-50">
+                                    <thead className="bg-gray-50 sticky top-0">
                                         <tr>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Empleado</th>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contrato</th>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fechas</th>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Días</th>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acción</th>
+                                            <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Fecha</th>
+                                            <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Contrato</th>
+                                            <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Incidencia</th>
+                                            <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Tipo</th>
+                                            <th className="px-4 py-3 text-center text-xs font-bold text-gray-500 uppercase">Días</th>
+                                            <th className="px-4 py-3 text-center text-xs font-bold text-gray-500 uppercase bg-blue-50">Saldo Ant.</th>
+                                            <th className="px-4 py-3 text-center text-xs font-bold text-gray-500 uppercase bg-green-50">Saldo Act.</th>
                                         </tr>
                                     </thead>
                                     <tbody className="bg-white divide-y divide-gray-200">
-                                        {solicitudes.map(sol => (
-                                            <tr key={sol.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setSelectedEvent(sol)}>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{sol.empleado_info.nombres} {sol.empleado_info.apellido_paterno}</td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-500">{sol.contrato_identificador}</td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{sol.fecha_inicio} - {sol.fecha_fin}</td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{sol.dias_calculados} {sol.es_medio_dia ? '(0.5)' : ''}</td>
-                                                <td className="px-6 py-4 whitespace-nowrap"><span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${sol.estado === 'aprobado' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>{sol.estado}</span></td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600 hover:text-blue-900">Ver Detalle</td>
+                                        {historial.map((entry, idx) => (
+                                            <tr key={idx} className="hover:bg-gray-50">
+                                                <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-900">{entry.fecha}</td>
+                                                <td className="px-4 py-3 whitespace-nowrap text-xs text-mono text-gray-500">{entry.contrato}</td>
+                                                <td className="px-4 py-3 text-xs text-gray-500 truncate max-w-[150px]" title={entry.incidencia}>{entry.incidencia}</td>
+                                                <td className="px-4 py-3 whitespace-nowrap text-xs">
+                                                    <span className={`px-2 py-0.5 rounded-full font-semibold ${entry.tipo === 'Consumo' ? 'bg-red-50 text-red-700' :
+                                                        entry.tipo === 'Leyes Sociales' ? 'bg-blue-50 text-blue-700' : 'bg-gray-50 text-gray-700'
+                                                        }`}>
+                                                        {entry.tipo}
+                                                    </span>
+                                                </td>
+                                                <td className={`px-4 py-3 text-center text-sm font-bold ${entry.dias < 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                                    {entry.dias > 0 ? `+${entry.dias}` : entry.dias}
+                                                </td>
+                                                <td className="px-4 py-3 text-center text-xs text-gray-400 font-mono">{entry.saldo_anterior}</td>
+                                                <td className="px-4 py-3 text-center text-sm font-black text-gray-900 bg-gray-50 font-mono">{entry.saldo_actual}</td>
                                             </tr>
                                         ))}
+                                        {historial.length === 0 && (
+                                            <tr>
+                                                <td colSpan={7} className="px-6 py-10 text-center text-gray-400 italic">No hay registros para este ciclo.</td>
+                                            </tr>
+                                        )}
                                     </tbody>
                                 </table>
                             )}
@@ -420,7 +469,49 @@ const VacacionesPage: React.FC = () => {
                     </div>
                 </div>
             )}
-        </div>
+
+            {showLiquidarModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+                    <div className="bg-white p-6 rounded-lg w-full max-w-md shadow-xl border-t-4 border-orange-500">
+                        <h2 className="text-xl font-bold mb-2 text-gray-800 flex items-center">
+                            <span className="mr-2">🔄</span> Liquidación y Renovación
+                        </h2>
+                        <form onSubmit={handleLiquidar}>
+                            <div className="mb-4">
+                                <SearchableSelect options={employeeOptions} selected={selectedEmployeeOption} onChange={(o) => setSelectedEmployeeOption(o)} label="Seleccionar Empleado" />
+                            </div>
+
+                            {saldoActual !== null && (
+                                <div className="mb-4 bg-orange-50 p-3 rounded border border-orange-200">
+                                    <p className="text-sm font-bold text-orange-800">Saldo a favor actual: <span className="text-xl ml-2">{saldoActual} d</span></p>
+                                </div>
+                            )}
+
+                            <div className="mb-4">
+                                <label className="block text-gray-700 text-sm font-bold mb-2">Fecha de Renovación (Nuevo ciclo)</label>
+                                <input type="date" value={nuevaFecha} onChange={e => setNuevaFecha(e.target.value)} className="w-full border rounded px-3 py-2 text-sm" required />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4 mb-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Pagar (Efectivo)</label>
+                                    <input type="number" step="0.5" value={diasPagar} onChange={e => setDiasPagar(Number(e.target.value))} className="w-full border rounded px-3 py-2 text-sm" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Guardar (Traspaso)</label>
+                                    <input type="number" step="0.5" value={diasGuardar} onChange={e => setDiasGuardar(Number(e.target.value))} className="w-full border rounded px-3 py-2 text-sm" />
+                                </div>
+                            </div>
+
+                            <div className="flex justify-end space-x-2 pt-2 border-t">
+                                <button type="button" onClick={() => setShowLiquidarModal(false)} className="px-4 py-2 bg-gray-200 rounded text-gray-700 hover:bg-gray-300">Cancelar</button>
+                                <button type="submit" className="px-4 py-2 bg-orange-600 text-white rounded hover:bg-orange-700 font-bold disabled:opacity-50" disabled={!selectedEmployeeOption}>Procesar</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+        </div >
     );
 };
 

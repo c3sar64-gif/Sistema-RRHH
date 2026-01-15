@@ -14,9 +14,11 @@ interface VacacionGuardada {
     empleado_nombre: string;
     dias: string;
     gestion: string;
+    fecha: string; // Nueva fecha de movimiento
     fecha_creacion: string;
     departamento_nombre?: string;
     contrato_nombre?: string;
+    saldo_calculado?: number; // Virtual para el ledger
 }
 
 const VacacionesGuardadasPage: React.FC = () => {
@@ -24,6 +26,7 @@ const VacacionesGuardadasPage: React.FC = () => {
     const [employeeOptions, setEmployeeOptions] = useState<SelectOption[]>([]);
     const [selectedEmployeeOption, setSelectedEmployeeOption] = useState<SelectOption | null>(null);
     const [saldoGuardado, setSaldoGuardado] = useState<string>('');
+    const [fecha, setFecha] = useState<string>(new Date().toISOString().split('T')[0]);
     const [gestion, setGestion] = useState<string>('');
     const [listaGuardadas, setListaGuardadas] = useState<VacacionGuardada[]>([]);
     const [loading, setLoading] = useState(false);
@@ -57,11 +60,32 @@ const VacacionesGuardadasPage: React.FC = () => {
     const fetchGuardadas = async () => {
         try {
             setLoading(true);
-            const response = await axios.get('http://127.0.0.1:8000/api/vacaciones-guardadas/', {
+            const response = await axios.get('http://127.0.0.1:8000/api/vacaciones-guardadas/?no_pagination=true', {
                 headers: { Authorization: `Token ${token}` }
             });
-            const data = response.data.results || response.data;
-            setListaGuardadas(Array.isArray(data) ? data : []);
+            const data: VacacionGuardada[] = response.data.results || response.data;
+
+            if (Array.isArray(data)) {
+                // Sort by employee and then date for ledger logic
+                data.sort((a, b) => {
+                    if (a.empleado !== b.empleado) return a.empleado - b.empleado;
+                    return new Date(a.fecha || a.fecha_creacion).getTime() - new Date(b.fecha || b.fecha_creacion).getTime();
+                });
+
+                // Calculate running balance per employee
+                const runningTotals: Record<number, number> = {};
+                const enriched = data.map(item => {
+                    const empId = item.empleado;
+                    const val = parseFloat(item.dias);
+                    runningTotals[empId] = (runningTotals[empId] || 0) + val;
+                    return { ...item, saldo_calculado: runningTotals[empId] };
+                });
+
+                // Final sort for display (usually newest first globally, but keep chronological per employee if desired)
+                // Let's show newest first globally for management
+                enriched.sort((a, b) => new Date(b.fecha || b.fecha_creacion).getTime() - new Date(a.fecha || a.fecha_creacion).getTime());
+                setListaGuardadas(enriched);
+            }
         } catch (error) {
             console.error("Error fetching guardadas", error);
         } finally {
@@ -82,6 +106,7 @@ const VacacionesGuardadasPage: React.FC = () => {
         const payload = {
             empleado: selectedEmployeeOption?.id,
             dias: saldoGuardado,
+            fecha: fecha,
             gestion: gestion
         };
 
@@ -93,6 +118,7 @@ const VacacionesGuardadasPage: React.FC = () => {
                 // Let's just update dias and gestion for Edit.
                 await axios.patch(`http://127.0.0.1:8000/api/vacaciones-guardadas/${editingId}/`, {
                     dias: saldoGuardado,
+                    fecha: fecha,
                     gestion: gestion
                 }, {
                     headers: { Authorization: `Token ${token}` }
@@ -131,6 +157,7 @@ const VacacionesGuardadasPage: React.FC = () => {
         const empOption = employeeOptions.find(opt => opt.id === item.empleado) || { id: item.empleado, nombre: item.empleado_nombre };
         setSelectedEmployeeOption(empOption);
         setSaldoGuardado(item.dias);
+        setFecha(item.fecha || item.fecha_creacion);
         setGestion(item.gestion || '');
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
@@ -139,6 +166,7 @@ const VacacionesGuardadasPage: React.FC = () => {
         setEditingId(null);
         setSelectedEmployeeOption(null);
         setSaldoGuardado('');
+        setFecha(new Date().toISOString().split('T')[0]);
         setGestion('');
     }
 
@@ -167,6 +195,15 @@ const VacacionesGuardadasPage: React.FC = () => {
                             onChange={(e) => setSaldoGuardado(e.target.value)}
                             className="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
                             placeholder="Ej. 15.0"
+                        />
+                    </div>
+                    <div className="w-full md:w-1/5">
+                        <label className="block text-gray-700 text-sm font-bold mb-2">Fecha Mov.</label>
+                        <input
+                            type="date"
+                            value={fecha}
+                            onChange={(e) => setFecha(e.target.value)}
+                            className="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
                         />
                     </div>
                     <div className="w-full md:w-1/4">
@@ -212,10 +249,10 @@ const VacacionesGuardadasPage: React.FC = () => {
                             <thead className="bg-gray-50">
                                 <tr>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Empleado</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contrato Origen</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Días</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha Mov.</th>
+                                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Movimiento</th>
+                                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider bg-blue-50">Saldo</th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Gestión / Motivo</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha Registro</th>
                                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
                                 </tr>
                             </thead>
@@ -225,19 +262,19 @@ const VacacionesGuardadasPage: React.FC = () => {
                                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                                             {item.empleado_nombre}
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 italic">
-                                            {item.contrato_nombre || 'N/A'}
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            {item.fecha || item.fecha_creacion}
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <span className="px-3 py-1 inline-flex text-sm leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                                                {item.dias}
+                                        <td className="px-6 py-4 whitespace-nowrap text-center">
+                                            <span className={`px-3 py-1 inline-flex text-sm leading-5 font-bold rounded-full ${parseFloat(item.dias) < 0 ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
+                                                {parseFloat(item.dias) > 0 ? `+${item.dias}` : item.dias}
                                             </span>
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-black text-blue-900 bg-blue-50">
+                                            {item.saldo_calculado?.toFixed(1)}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                             {item.gestion || '-'}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            {item.fecha_creacion}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                             <button
