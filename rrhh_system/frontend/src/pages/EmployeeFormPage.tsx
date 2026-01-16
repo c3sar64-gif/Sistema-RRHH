@@ -607,6 +607,19 @@ export const EmployeeFormPage: React.FC = () => {
             {errors.fecha_ingreso_vigente && <p className="mt-1 text-xs text-red-500">{errors.fecha_ingreso_vigente}</p>}
           </div>
           <div>
+            <label htmlFor="estado" className="block text-sm font-medium text-gray-700">Estado</label>
+            <select
+              id="estado"
+              name="estado"
+              value={(employeeData as any).estado || 'activo'}
+              onChange={handleChange}
+              className={`${inputStyles}`}
+            >
+              <option value="activo">Activo</option>
+              <option value="inactivo">Inactivo</option>
+            </select>
+          </div>
+          <div>
             <SearchableSelect
               label="Departamento (Sector)"
               options={departamentos}

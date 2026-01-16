@@ -23,9 +23,9 @@ export const AppLayout: React.FC = () => {
   const canManageCore = isAdmin || isRRHH;
 
   return (
-    <div className="flex h-screen bg-gray-200 font-sans">
+    <div className="flex h-screen bg-gray-200 font-sans print:h-auto print:overflow-visible print:bg-white">
       {/* Sidebar */}
-      <div className="hidden md:flex flex-col w-64 bg-gray-800">
+      <div className="hidden md:flex flex-col w-64 bg-gray-800 print:hidden">
         <div className="flex items-center justify-center h-20 shadow-md">
           <h1 className="text-2xl font-bold text-white">Recursos Humanos</h1>
         </div>
@@ -62,11 +62,23 @@ export const AppLayout: React.FC = () => {
               <ClockIcon />
               <span className="mx-4">Vacaciones</span>
             </NavLink>
+            <NavLink to="/cumpleanos" className={({ isActive }) => `${navLinkClasses} ${isActive ? activeNavLinkClasses : ''}`}>
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 15.546c-.523 0-1.046.151-1.5.454a2.704 2.704 0 01-3 0 2.704 2.704 0 00-3 0 2.704 2.704 0 01-3 0 2.704 2.704 0 00-3 0 2.704 2.704 0 01-3 0 2.701 2.701 0 00-1.5-.454M9 6v2m3-2v2m3-2v2M9 3h.01M12 3h.01M15 3h.01M21 21v-7a2 2 0 00-2-2H5a2 2 0 00-2 2v7h18zm-3-9v-2a2 2 0 00-2-2H8a2 2 0 00-2 2v2h12z" />
+              </svg>
+              <span className="mx-4">Cumpleaños</span>
+            </NavLink>
 
             {/* Admin-only Link */}
             {isAdmin && (
               <>
                 <hr className="my-4 border-gray-600" />
+                <NavLink to="/reportes" className={({ isActive }) => `${navLinkClasses} ${isActive ? activeNavLinkClasses : ''}`}>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <span className="mx-4">Reportes</span>
+                </NavLink>
                 <NavLink to="/admin-usuarios" className={({ isActive }) => `${navLinkClasses} ${isActive ? activeNavLinkClasses : ''}`}>
                   <ShieldCheckIcon />
                   <span className="mx-4">Administrar Usuarios</span>
@@ -87,8 +99,8 @@ export const AppLayout: React.FC = () => {
       </div>
 
       {/* Main Content */}
-      <div className="flex flex-col flex-grow">
-        <main className="flex-grow p-6">
+      <div className="flex flex-col flex-grow print:block print:h-auto print:overflow-visible">
+        <main className="flex-grow p-6 print:p-0 print:block print:h-auto print:overflow-visible">
           {/* Outlet para renderizar las páginas anidadas */}
           <Outlet />
         </main>

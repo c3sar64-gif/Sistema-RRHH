@@ -1,3 +1,23 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@media print {
+
+    html,
+    body,
+    #root {
+        height: auto !important;
+        min-height: auto !important;
+        overflow: visible !important;
+        background: white !important;
+    }
+
+    /* Esconder elementos que no sean del área de impresión si es necesario,
+     pero por ahora confiamos en las clases print:hidden */
+
+    /* Asegurar que el contenido principal sea visible */
+    #root {
+        display: block !important;
+    }
+}

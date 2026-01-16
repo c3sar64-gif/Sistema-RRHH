@@ -232,15 +232,15 @@ export const EmployeeDetailPage: React.FC = () => {
       </div>
 
       {/* History Sections */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 mt-8 print:hidden">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 mt-8 print:block print:mt-4 print:break-before-auto">
         {/* History Vacations */}
-        <div id="historial-vacaciones" className="bg-white p-6 rounded-lg shadow-md scroll-mt-20">
-          <h3 className="text-xl font-bold text-gray-700 mb-4 border-b pb-2">Historial de Vacaciones</h3>
+        <div id="historial-vacaciones" className="bg-white p-6 rounded-lg shadow-md scroll-mt-20 print:shadow-none print:p-0 print:mb-4 print:break-inside-avoid">
+          <h3 className="text-xl font-bold text-gray-700 mb-4 border-b pb-2 print:text-lg print:mb-2">Historial de Vacaciones</h3>
           {vacaciones.length === 0 ? (
             <p className="text-gray-500 italic py-4">No hay solicitudes de vacaciones registradas.</p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
+            <div className="overflow-x-auto print:overflow-visible">
+              <table className="min-w-full divide-y divide-gray-200 print:text-xs">
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-4 py-2 text-left text-xs font-bold text-gray-500 uppercase">Inicio</th>
@@ -271,13 +271,13 @@ export const EmployeeDetailPage: React.FC = () => {
         </div>
 
         {/* History Permissions */}
-        <div id="historial-permisos" className="bg-white p-6 rounded-lg shadow-md scroll-mt-20">
-          <h3 className="text-xl font-bold text-gray-700 mb-4 border-b pb-2">Historial de Permisos</h3>
+        <div id="historial-permisos" className="bg-white p-6 rounded-lg shadow-md scroll-mt-20 print:shadow-none print:p-0 print:break-inside-avoid">
+          <h3 className="text-xl font-bold text-gray-700 mb-4 border-b pb-2 print:text-lg print:mb-2">Historial de Permisos</h3>
           {permisos.length === 0 ? (
             <p className="text-gray-500 italic py-4">No hay registros de permisos.</p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
+            <div className="overflow-x-auto print:overflow-visible">
+              <table className="min-w-full divide-y divide-gray-200 print:text-xs">
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-4 py-2 text-left text-xs font-bold text-gray-500 uppercase">Fecha</th>

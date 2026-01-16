@@ -60,6 +60,13 @@ class Empleado(models.Model):
     # HR Information
     fecha_ingreso_inicial = models.DateField()
     fecha_ingreso_vigente = models.DateField(null=True, blank=True, help_text="Fecha de ingreso del contrato vigente")
+    
+    ESTADO_EMPLEADO_CHOICES = [
+        ('activo', 'Activo'),
+        ('inactivo', 'Inactivo'),
+    ]
+    estado = models.CharField(max_length=20, choices=ESTADO_EMPLEADO_CHOICES, default='activo')
+    
     feature_vacaciones = models.BooleanField(default=True)
     # vacaciones_guardadas removed in favor of separate model
     cargo = models.ForeignKey(Cargo, on_delete=models.SET_NULL, null=True, blank=True)

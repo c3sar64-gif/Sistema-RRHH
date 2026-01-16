@@ -8,17 +8,17 @@ interface SelectOption {
     nombre: string;
 }
 
-interface VacacionGuardada {
+interface LedgerItem {
     id: number;
+    uniq_key: string;
+    type: 'guardada' | 'solicitud';
     empleado: number;
     empleado_nombre: string;
-    dias: string;
-    gestion: string;
-    fecha: string; // Nueva fecha de movimiento
-    fecha_creacion: string;
-    departamento_nombre?: string;
-    contrato_nombre?: string;
-    saldo_calculado?: number; // Virtual para el ledger
+    fecha: string;
+    detalle: string;
+    dias: number; // Remaining days (or active days)
+    dias_originales?: number;
+    original_item: any;
 }
 
 const VacacionesGuardadasPage: React.FC = () => {
@@ -28,13 +28,13 @@ const VacacionesGuardadasPage: React.FC = () => {
     const [saldoGuardado, setSaldoGuardado] = useState<string>('');
     const [fecha, setFecha] = useState<string>(new Date().toISOString().split('T')[0]);
     const [gestion, setGestion] = useState<string>('');
-    const [listaGuardadas, setListaGuardadas] = useState<VacacionGuardada[]>([]);
+    const [ledgerItems, setLedgerItems] = useState<LedgerItem[]>([]);
     const [loading, setLoading] = useState(false);
     const [editingId, setEditingId] = useState<number | null>(null);
 
     useEffect(() => {
         fetchEmpleados();
-        fetchGuardadas();
+        fetchLedgerData();
     }, [token]);
 
     const fetchEmpleados = async () => {
@@ -48,7 +48,6 @@ const VacacionesGuardadasPage: React.FC = () => {
                     id: emp.id,
                     nombre: `${emp.nombres} ${emp.apellido_paterno} ${emp.apellido_materno || ''}`.trim()
                 }));
-                // Sort by name
                 options.sort((a: SelectOption, b: SelectOption) => a.nombre.localeCompare(b.nombre));
                 setEmployeeOptions(options);
             }
@@ -57,51 +56,43 @@ const VacacionesGuardadasPage: React.FC = () => {
         }
     };
 
-    const fetchGuardadas = async () => {
+    const fetchLedgerData = async () => {
         try {
             setLoading(true);
-            const response = await axios.get('http://127.0.0.1:8000/api/vacaciones-guardadas/?no_pagination=true', {
+
+            // 1. Fetch Employees for dropdown (needed for filtering/manual entry)
+            const resEmp = await axios.get('http://127.0.0.1:8000/api/empleados/?no_pagination=true', {
                 headers: { Authorization: `Token ${token}` }
             });
-            const data: VacacionGuardada[] = response.data.results || response.data;
+            const emps = resEmp.data.results || resEmp.data;
 
-            if (Array.isArray(data)) {
-                // Sort by employee and then date for ledger logic
-                data.sort((a, b) => {
-                    if (a.empleado !== b.empleado) return a.empleado - b.empleado;
-                    return new Date(a.fecha || a.fecha_creacion).getTime() - new Date(b.fecha || b.fecha_creacion).getTime();
-                });
-
-                // Calculate running balance per employee
-                const runningTotals: Record<number, number> = {};
-                const enriched = data.map(item => {
-                    const empId = item.empleado;
-                    const val = parseFloat(item.dias);
-                    runningTotals[empId] = (runningTotals[empId] || 0) + val;
-                    return { ...item, saldo_calculado: runningTotals[empId] };
-                });
-
-                // Final sort for display (usually newest first globally, but keep chronological per employee if desired)
-                // Let's show newest first globally for management
-                enriched.sort((a, b) => new Date(b.fecha || b.fecha_creacion).getTime() - new Date(a.fecha || a.fecha_creacion).getTime());
-                setListaGuardadas(enriched);
+            if (Array.isArray(emps)) {
+                const options = emps.map((emp: any) => ({
+                    id: emp.id,
+                    nombre: `${emp.nombres} ${emp.apellido_paterno} ${emp.apellido_materno || ''}`.trim()
+                }));
+                options.sort((a, b) => a.nombre.localeCompare(b.nombre));
+                setEmployeeOptions(options);
             }
+
+            // 2. Fetch Optimized Global Ledger (Single Request)
+            const resLedger = await axios.get('http://127.0.0.1:8000/api/vacaciones-solicitudes/global_ledger/', {
+                headers: { Authorization: `Token ${token}` }
+            });
+
+            // Backend already performed calculation and filtering
+            setLedgerItems(resLedger.data);
+
         } catch (error) {
-            console.error("Error fetching guardadas", error);
+            console.error("Error fetching ledger data", error);
         } finally {
             setLoading(false);
         }
     };
 
     const handleSave = async () => {
-        if (!selectedEmployeeOption && !editingId) {
-            alert("Seleccione un empleado.");
-            return;
-        }
-        if (saldoGuardado === '' || isNaN(Number(saldoGuardado))) {
-            alert("Ingrese una cantidad de días válida.");
-            return;
-        }
+        if (!selectedEmployeeOption && !editingId) { alert("Seleccione un empleado."); return; }
+        if (saldoGuardado === '' || isNaN(Number(saldoGuardado))) { alert("Ingrese una cantidad de días válida."); return; }
 
         const payload = {
             empleado: selectedEmployeeOption?.id,
@@ -112,15 +103,7 @@ const VacacionesGuardadasPage: React.FC = () => {
 
         try {
             if (editingId) {
-                // For edit, we might not change employee, so payload might need adjustment if logic requires.
-                // But usually we just update dias/gestion.
-                // Assuming employee can't be changed on edit easily without reselections, or we strictly follow ID.
-                // Let's just update dias and gestion for Edit.
-                await axios.patch(`http://127.0.0.1:8000/api/vacaciones-guardadas/${editingId}/`, {
-                    dias: saldoGuardado,
-                    fecha: fecha,
-                    gestion: gestion
-                }, {
+                await axios.patch(`http://127.0.0.1:8000/api/vacaciones-guardadas/${editingId}/`, payload, {
                     headers: { Authorization: `Token ${token}` }
                 });
                 alert("Registro actualizado.");
@@ -130,9 +113,8 @@ const VacacionesGuardadasPage: React.FC = () => {
                 });
                 alert("Vacaciones guardadas registradas.");
             }
-
             resetForm();
-            fetchGuardadas();
+            fetchLedgerData();
         } catch (error) {
             console.error("Error saving vacaciones guardadas", error);
             alert("Error al guardar.");
@@ -140,25 +122,27 @@ const VacacionesGuardadasPage: React.FC = () => {
     };
 
     const handleDelete = async (id: number) => {
-        if (!window.confirm("¿Seguro que desea eliminar este registro?")) return;
+        if (!window.confirm("¿Seguro que desea eliminar este registro manual?")) return;
         try {
             await axios.delete(`http://127.0.0.1:8000/api/vacaciones-guardadas/${id}/`, {
                 headers: { Authorization: `Token ${token}` }
             });
-            fetchGuardadas();
+            fetchLedgerData();
         } catch (error) {
             console.error("Error deleting", error);
             alert("Error al eliminar.");
         }
     }
 
-    const handleEdit = (item: VacacionGuardada) => {
+    const handleEdit = (item: LedgerItem) => {
+        if (item.type !== 'guardada') return;
         setEditingId(item.id);
-        const empOption = employeeOptions.find(opt => opt.id === item.empleado) || { id: item.empleado, nombre: item.empleado_nombre };
+        const g = item.original_item;
+        const empOption = employeeOptions.find(opt => opt.id === g.empleado) || { id: g.empleado, nombre: g.empleado_nombre };
         setSelectedEmployeeOption(empOption);
-        setSaldoGuardado(item.dias);
-        setFecha(item.fecha || item.fecha_creacion);
-        setGestion(item.gestion || '');
+        setSaldoGuardado(g.dias);
+        setFecha(g.fecha || g.fecha_creacion);
+        setGestion(g.gestion || '');
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
@@ -172,10 +156,10 @@ const VacacionesGuardadasPage: React.FC = () => {
 
     return (
         <div className="min-h-screen bg-gray-100 p-6">
-            <h1 className="text-3xl font-bold text-gray-800 mb-6">Gestión de Vacaciones Guardadas</h1>
+            <h1 className="text-3xl font-bold text-gray-800 mb-6">Gestión de Vacaciones Guardadas (Ledger Global)</h1>
 
             <div className="bg-white p-6 rounded-lg shadow-md mb-8">
-                <h2 className="text-xl font-semibold mb-4 text-gray-700">{editingId ? 'Editar Registro' : 'Nueva Asignación'}</h2>
+                <h2 className="text-xl font-semibold mb-4 text-gray-700">{editingId ? 'Editar Manualmente' : 'Nuevo Abono / Ajuste Manual'}</h2>
                 <div className="flex flex-col md:flex-row gap-4 items-end">
                     <div className="w-full md:w-1/3">
                         <SearchableSelect
@@ -183,18 +167,18 @@ const VacacionesGuardadasPage: React.FC = () => {
                             options={employeeOptions}
                             selected={selectedEmployeeOption}
                             onChange={(option) => setSelectedEmployeeOption(option)}
-                            disabled={!!editingId} // Disable employee change on edit to be safe/simple
+                            disabled={!!editingId}
                         />
                     </div>
                     <div className="w-full md:w-1/5">
-                        <label className="block text-gray-700 text-sm font-bold mb-2">Días</label>
+                        <label className="block text-gray-700 text-sm font-bold mb-2">Días (+/-)</label>
                         <input
                             type="number"
                             step="0.5"
                             value={saldoGuardado}
                             onChange={(e) => setSaldoGuardado(e.target.value)}
                             className="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
-                            placeholder="Ej. 15.0"
+                            placeholder="Ej. 15.0 o -5"
                         />
                     </div>
                     <div className="w-full md:w-1/5">
@@ -207,7 +191,7 @@ const VacacionesGuardadasPage: React.FC = () => {
                         />
                     </div>
                     <div className="w-full md:w-1/4">
-                        <label className="block text-gray-700 text-sm font-bold mb-2">Gestión / Motivo</label>
+                        <label className="block text-gray-700 text-sm font-bold mb-2">Detalle / Motivo</label>
                         <input
                             type="text"
                             value={gestion}
@@ -217,17 +201,11 @@ const VacacionesGuardadasPage: React.FC = () => {
                         />
                     </div>
                     <div className="w-full md:w-auto pb-1 flex gap-2">
-                        <button
-                            onClick={handleSave}
-                            className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition shadow font-semibold"
-                        >
+                        <button onClick={handleSave} className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition shadow font-semibold">
                             {editingId ? 'Actualizar' : 'Guardar'}
                         </button>
                         {editingId && (
-                            <button
-                                onClick={resetForm}
-                                className="bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600 transition shadow"
-                            >
+                            <button onClick={resetForm} className="bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600 transition shadow">
                                 Cancelar
                             </button>
                         )}
@@ -236,59 +214,48 @@ const VacacionesGuardadasPage: React.FC = () => {
             </div>
 
             <div className="bg-white rounded-lg shadow-md overflow-hidden">
-                <div className="p-4 bg-gray-50 border-b">
-                    <h2 className="text-lg font-semibold text-gray-700">Historial de Vacaciones Guardadas</h2>
+                <div className="p-4 bg-gray-50 border-b flex justify-between items-center">
+                    <h2 className="text-lg font-semibold text-gray-700">Vacaciones Guardadas Vigentes</h2>
                 </div>
                 {loading ? (
                     <div className="p-8 text-center text-gray-500">Cargando...</div>
-                ) : listaGuardadas.length === 0 ? (
-                    <div className="p-8 text-center text-gray-500">No hay registros.</div>
+                ) : ledgerItems.length === 0 ? (
+                    <div className="p-8 text-center text-gray-500">No hay registros vigentes.</div>
                 ) : (
                     <div className="overflow-x-auto">
                         <table className="min-w-full divide-y divide-gray-200">
-                            <thead className="bg-gray-50">
+                            <thead className="bg-gray-50 sticky top-0">
                                 <tr>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Empleado</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha Mov.</th>
-                                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Movimiento</th>
-                                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider bg-blue-50">Saldo</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Gestión / Motivo</th>
-                                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Detalle</th>
+                                    <th className="px-6 py-3 text-right text-xs font-bold text-gray-700 uppercase tracking-wider bg-blue-50">Días</th>
+                                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
                                 </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200">
-                                {listaGuardadas.map((item) => (
-                                    <tr key={item.id} className="hover:bg-gray-50 transition">
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                {ledgerItems.map((item) => (
+                                    <tr key={item.uniq_key} className="hover:bg-gray-50 transition">
+                                        <td className="px-6 py-4 whitespace-nowrap text-xs font-bold text-gray-800">
                                             {item.empleado_nombre}
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            {item.fecha || item.fecha_creacion}
+                                        <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-500">
+                                            {item.fecha}
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-center">
-                                            <span className={`px-3 py-1 inline-flex text-sm leading-5 font-bold rounded-full ${parseFloat(item.dias) < 0 ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
-                                                {parseFloat(item.dias) > 0 ? `+${item.dias}` : item.dias}
-                                            </span>
+                                        <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-600">
+                                            {item.detalle}
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-black text-blue-900 bg-blue-50">
-                                            {item.saldo_calculado?.toFixed(1)}
+                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-black font-mono text-blue-900 bg-blue-50">
+                                            {item.dias.toFixed(1)}
+                                            {item.dias_originales && item.dias !== item.dias_originales && (
+                                                <span className="text-[10px] text-gray-400 block font-normal">
+                                                    (Orig: {item.dias_originales})
+                                                </span>
+                                            )}
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            {item.gestion || '-'}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                            <button
-                                                onClick={() => handleEdit(item)}
-                                                className="text-indigo-600 hover:text-indigo-900 mr-4"
-                                            >
-                                                Editar
-                                            </button>
-                                            <button
-                                                onClick={() => handleDelete(item.id)}
-                                                className="text-red-600 hover:text-red-900"
-                                            >
-                                                Eliminar
-                                            </button>
+                                        <td className="px-6 py-4 whitespace-nowrap text-center text-xs font-medium">
+                                            <button onClick={() => handleEdit(item)} className="text-indigo-600 hover:text-indigo-900 mr-3">Editar</button>
+                                            <button onClick={() => handleDelete(item.id)} className="text-red-600 hover:text-red-900">Eliminar</button>
                                         </td>
                                     </tr>
                                 ))}

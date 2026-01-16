@@ -14,6 +14,7 @@ interface Employee {
   cargo_nombre: string;
   departamento_nombre: string;
   celular: string;
+  estado: string; // Add estado
 }
 
 // Interfaz para el formato de opciones de SearchableSelect
@@ -73,11 +74,11 @@ export const EmployeePage: React.FC = () => {
     try {
       setLoading(true);
       const url = `http://127.0.0.1:8000/api/empleados/?page=${page}&search=${search}`;
-      
+
       const response = await axios.get(url, {
         headers: { 'Authorization': `Token ${token}` }
       });
-      
+
       if (response.data && Array.isArray(response.data.results)) {
         setEmployees(response.data.results);
         setTotalPages(Math.ceil(response.data.count / 10)); // Assuming PAGE_SIZE is 10
@@ -130,56 +131,62 @@ export const EmployeePage: React.FC = () => {
           label="Buscar empleado por nombre o apellido"
         />
       </div>
-      
+
       <div className="bg-white p-6 rounded-lg shadow-md">
         <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                    <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nombre Completo</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">CI</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cargo</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Departamento</th>
-                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Acciones</th>
-                    </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                    {employees.map((emp) => (
-                        <tr key={emp.id}>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                {`${emp.nombres} ${emp.apellido_paterno} ${emp.apellido_materno}`}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{emp.ci}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{emp.cargo_nombre}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{emp.departamento_nombre}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-right">
-                                <button onClick={() => navigate(`/empleados/ver/${emp.id}`)} className="text-gray-600 hover:text-indigo-900 mr-4">Ver</button>
-                                <button onClick={() => navigate(`/empleados/editar/${emp.id}`)} className="text-indigo-600 hover:text-indigo-900 mr-4">Editar</button>
-                                <button onClick={() => handleDelete(emp.id)} className="text-red-600 hover:text-red-900">Eliminar</button>
-                            </td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nombre Completo</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">CI</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cargo</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Departamento</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Acciones</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {employees.map((emp) => (
+                <tr key={emp.id}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    {`${emp.nombres} ${emp.apellido_paterno} ${emp.apellido_materno}`}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{emp.ci}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{emp.cargo_nombre}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{emp.departamento_nombre}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${emp.estado === 'activo' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                      {emp.estado ? (emp.estado.charAt(0).toUpperCase() + emp.estado.slice(1)) : 'Activo'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-right">
+                    <button onClick={() => navigate(`/empleados/ver/${emp.id}`)} className="text-gray-600 hover:text-indigo-900 mr-4">Ver</button>
+                    <button onClick={() => navigate(`/empleados/editar/${emp.id}`)} className="text-indigo-600 hover:text-indigo-900 mr-4">Editar</button>
+                    <button onClick={() => handleDelete(emp.id)} className="text-red-600 hover:text-red-900">Eliminar</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
         <div className="mt-4 flex justify-between items-center">
-            <button 
-                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} 
-                disabled={currentPage === 1}
-                className="px-4 py-2 bg-gray-300 text-gray-800 rounded-md disabled:opacity-50 hover:shadow-md"
-            >
-                Anterior
-            </button>
-            <span>
-                Página {currentPage} de {totalPages}
-            </span>
-            <button 
-                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} 
-                disabled={currentPage === totalPages}
-                className="px-4 py-2 bg-gray-300 text-gray-800 rounded-md disabled:opacity-50 hover:shadow-md"
-            >
-                Siguiente
-            </button>
+          <button
+            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+            disabled={currentPage === 1}
+            className="px-4 py-2 bg-gray-300 text-gray-800 rounded-md disabled:opacity-50 hover:shadow-md"
+          >
+            Anterior
+          </button>
+          <span>
+            Página {currentPage} de {totalPages}
+          </span>
+          <button
+            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+            disabled={currentPage === totalPages}
+            className="px-4 py-2 bg-gray-300 text-gray-800 rounded-md disabled:opacity-50 hover:shadow-md"
+          >
+            Siguiente
+          </button>
         </div>
       </div>
     </div>

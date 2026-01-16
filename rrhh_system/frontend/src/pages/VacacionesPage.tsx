@@ -67,8 +67,14 @@ const VacacionesPage: React.FC = () => {
     const [nuevaFecha, setNuevaFecha] = useState(moment().format('YYYY-MM-DD'));
     const [diasPagar, setDiasPagar] = useState<number>(0);
     const [diasGuardar, setDiasGuardar] = useState<number>(0);
+    const [currentDate, setCurrentDate] = useState(new Date());
 
     const canManage = user?.is_superuser || user?.groups.some(g => ['Admin', 'RRHH', 'Jefe de Departamento'].includes(g.name));
+
+    const [searchTerm, setSearchTerm] = useState('');
+    const [searchEmployeeGlobal, setSearchEmployeeGlobal] = useState<SelectOption | null>(null);
+    const [filteredHistorial, setFilteredHistorial] = useState<any[]>([]);
+    const [loadingHistorial, setLoadingHistorial] = useState(false);
 
     useEffect(() => {
         fetchData();
@@ -86,6 +92,7 @@ const VacacionesPage: React.FC = () => {
             setSaldoActual(null);
             setFechaIngresoVigente(null);
             setVacacionGuardada(null);
+            setHistorial([]); // Clear when deselected
         }
     }, [selectedEmployeeOption]);
 
@@ -93,13 +100,88 @@ const VacacionesPage: React.FC = () => {
         calculateDays();
     }, [fechaInicio, fechaFin, esMedioDia]);
 
+    // Filter Logic
+    // React to Search Term changes with Debounce
+    useEffect(() => {
+        if (!showListModal) return;
+
+        // If an employee is explicitly selected via dropdown, we just filter locally
+        if (selectedEmployeeOption) {
+            if (!searchTerm) {
+                setFilteredHistorial(historial);
+            } else {
+                const lower = searchTerm.toLowerCase();
+                setFilteredHistorial(historial.filter(h =>
+                    (h.incidencia && h.incidencia.toLowerCase().includes(lower)) ||
+                    (h.contrato && h.contrato.toLowerCase().includes(lower))
+                ));
+            }
+            return;
+        }
+
+        // If Global Mode (no specific employee selected)
+        if (searchEmployeeGlobal) {
+            setLoadingHistorial(true);
+            axios.get(`http://127.0.0.1:8000/api/vacaciones-solicitudes/saldo/?empleado_id=${searchEmployeeGlobal.id}`, {
+                headers: { Authorization: `Token ${token}` }
+            }).then(res => {
+                const hist = (res.data.historial || []).map((h: any) => ({
+                    ...h,
+                    empleado_nombre: searchEmployeeGlobal.nombre
+                }));
+                // Sort ASC (Oldest first)
+                hist.sort((a: any, b: any) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime());
+
+                setHistorial(hist);
+                setFilteredHistorial(hist);
+            }).catch(err => {
+                console.error(err);
+                setHistorial([]);
+                setFilteredHistorial([]);
+            }).finally(() => setLoadingHistorial(false));
+        } else {
+            // If no employee selected in global filter, show empty or maybe all?
+            // Original logic showed nothing if no search term. I'll keep that.
+            setHistorial([]);
+            setFilteredHistorial([]);
+        }
+    }, [searchTerm, showListModal, selectedEmployeeOption, searchEmployeeGlobal]);
+
+    // Modal Open Logic
+    useEffect(() => {
+        if (showListModal) {
+            if (!selectedEmployeeOption) {
+                // Start clean
+                setHistorial([]);
+                setFilteredHistorial([]);
+                setSearchTerm('');
+            } else {
+                // Ensure ASC sort for consistency
+                const sorted = [...historial].sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime());
+                if (JSON.stringify(sorted) !== JSON.stringify(historial)) {
+                    setHistorial(sorted);
+                    setFilteredHistorial(sorted);
+                } else {
+                    setFilteredHistorial(historial);
+                }
+            }
+        }
+    }, [showListModal]);
+
+
+
     const fetchSaldo = async (empId: number) => {
         try {
             const res = await axios.get(`http://127.0.0.1:8000/api/vacaciones-solicitudes/saldo/?empleado_id=${empId}`, {
                 headers: { Authorization: `Token ${token}` }
             });
             setSaldoActual(res.data.saldo);
-            setHistorial(res.data.historial || []);
+
+            // Default sort ASC (Oldest first)
+            let hist = res.data.historial || [];
+            hist.sort((a: any, b: any) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime());
+
+            setHistorial(hist);
             setSaldoGuardadas(res.data.saldo_guardadas);
             setSaldoLey(res.data.saldo_ley);
             setFechaIngresoVigente(res.data.fecha_ingreso_vigente);
@@ -109,6 +191,7 @@ const VacacionesPage: React.FC = () => {
         } catch (error) {
             console.error("Error fetching saldo", error);
             setSaldoActual(0);
+            setHistorial([]);
             setSaldoGuardadas(0);
             setSaldoLey(0);
             setFechaIngresoVigente(null);
@@ -284,13 +367,14 @@ const VacacionesPage: React.FC = () => {
                 <Calendar
                     localizer={localizer}
                     events={events}
+                    date={currentDate}
+                    onNavigate={(date) => setCurrentDate(date)}
                     startAccessor="start"
                     endAccessor="end"
                     style={{ height: '100%' }}
                     messages={{ next: "Siguiente", previous: "Anterior", today: "Hoy", month: "Mes", week: "Semana", day: "Día" }}
                     eventPropGetter={eventStyleGetter}
                     onSelectEvent={(event) => { setSelectedEvent(event.resource); setShowListModal(true); }}
-                    onNavigate={(date) => { /* opcional: actualizar algo al cambiar mes */ }}
                 />
             </div>
 
@@ -311,7 +395,8 @@ const VacacionesPage: React.FC = () => {
                                     {antiguedadDetalle && (
                                         <p className="text-gray-600"><strong>Antigüedad:</strong> {antiguedadDetalle}</p>
                                     )}
-                                    {vacacionPorLey !== null && (
+                                    {/* Hiding summary blocks as requested
+                                   {vacacionPorLey !== null && (
                                         <p className="text-blue-600 font-bold">
                                             Vacación por Ley: <span className="text-lg">{vacacionPorLey} días</span>
                                         </p>
@@ -321,6 +406,7 @@ const VacacionesPage: React.FC = () => {
                                             Vacaciones Guardadas: <span className="text-sm font-bold">{vacacionGuardada}</span>
                                         </p>
                                     )}
+                                    */}
                                 </div>
                             )}
 
@@ -335,6 +421,14 @@ const VacacionesPage: React.FC = () => {
                                             <p className="text-[10px] uppercase tracking-wider text-blue-500 font-bold">Por Ley Actual</p>
                                             <p className="text-lg font-bold text-blue-700">{saldoLey || 0} d</p>
                                         </div>
+                                    </div>
+
+                                    <div className="p-3 bg-blue-50 rounded border border-blue-100 flex justify-between items-center">
+                                        <div className="flex flex-col">
+                                            <p className="text-xs uppercase tracking-wider text-blue-600 font-bold">Saldo Actual Total</p>
+                                            <p className="text-xs text-blue-400 font-normal">(Guardadas + Ley acumulada)</p>
+                                        </div>
+                                        <p className="text-2xl font-black text-blue-800">{saldoActual} <span className="text-sm font-normal">días</span></p>
                                     </div>
 
                                     {diasCalculados > 0 && (
@@ -401,11 +495,35 @@ const VacacionesPage: React.FC = () => {
 
             {showListModal && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-                    <div className="bg-white p-6 rounded-lg w-full max-w-4xl shadow-xl h-3/4 flex flex-col">
+                    <div className="bg-white p-6 rounded-lg w-full max-w-5xl shadow-xl h-3/4 flex flex-col">
                         <div className="flex justify-between items-center mb-4">
-                            <h2 className="text-xl font-bold text-gray-800">{selectedEvent ? 'Detalle de Solicitud' : 'Listado de Vacaciones'}</h2>
-                            <button onClick={() => { setShowListModal(false); setSelectedEvent(null); }} className="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+                            <h2 className="text-xl font-bold text-gray-800">
+                                {selectedEvent ? 'Detalle de Solicitud' : (selectedEmployeeOption ? `Historial: ${selectedEmployeeOption.nombre}` : 'Listado Global de Vacaciones')}
+                            </h2>
+                            <button onClick={() => { setShowListModal(false); setSelectedEvent(null); setSearchTerm(''); }} className="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
                         </div>
+
+                        {!selectedEvent && (
+                            <div className="mb-4">
+                                {selectedEmployeeOption ? (
+                                    <input
+                                        type="text"
+                                        placeholder="🔍 Buscar por contrato o detalle..."
+                                        value={searchTerm}
+                                        onChange={e => setSearchTerm(e.target.value)}
+                                        className="w-full border rounded px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
+                                    />
+                                ) : (
+                                    <SearchableSelect
+                                        options={employeeOptions}
+                                        selected={searchEmployeeGlobal}
+                                        onChange={(o) => setSearchEmployeeGlobal(o)}
+                                        label="🔍 Buscar empleado..."
+                                    />
+                                )}
+                            </div>
+                        )}
+
                         <div className="flex-grow overflow-auto p-2">
                             {selectedEvent ? (
                                 <div className="space-y-4">
@@ -425,45 +543,58 @@ const VacacionesPage: React.FC = () => {
                                     )}
                                 </div>
                             ) : (
-                                <table className="min-w-full divide-y divide-gray-200">
-                                    <thead className="bg-gray-50 sticky top-0">
-                                        <tr>
-                                            <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Fecha</th>
-                                            <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Contrato</th>
-                                            <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Incidencia</th>
-                                            <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Tipo</th>
-                                            <th className="px-4 py-3 text-center text-xs font-bold text-gray-500 uppercase">Días</th>
-                                            <th className="px-4 py-3 text-center text-xs font-bold text-gray-500 uppercase bg-blue-50">Saldo Ant.</th>
-                                            <th className="px-4 py-3 text-center text-xs font-bold text-gray-500 uppercase bg-green-50">Saldo Act.</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="bg-white divide-y divide-gray-200">
-                                        {historial.map((entry, idx) => (
-                                            <tr key={idx} className="hover:bg-gray-50">
-                                                <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-900">{entry.fecha}</td>
-                                                <td className="px-4 py-3 whitespace-nowrap text-xs text-mono text-gray-500">{entry.contrato}</td>
-                                                <td className="px-4 py-3 text-xs text-gray-500 truncate max-w-[150px]" title={entry.incidencia}>{entry.incidencia}</td>
-                                                <td className="px-4 py-3 whitespace-nowrap text-xs">
-                                                    <span className={`px-2 py-0.5 rounded-full font-semibold ${entry.tipo === 'Consumo' ? 'bg-red-50 text-red-700' :
-                                                        entry.tipo === 'Leyes Sociales' ? 'bg-blue-50 text-blue-700' : 'bg-gray-50 text-gray-700'
-                                                        }`}>
-                                                        {entry.tipo}
-                                                    </span>
-                                                </td>
-                                                <td className={`px-4 py-3 text-center text-sm font-bold ${entry.dias < 0 ? 'text-red-600' : 'text-green-600'}`}>
-                                                    {entry.dias > 0 ? `+${entry.dias}` : entry.dias}
-                                                </td>
-                                                <td className="px-4 py-3 text-center text-xs text-gray-400 font-mono">{entry.saldo_anterior}</td>
-                                                <td className="px-4 py-3 text-center text-sm font-black text-gray-900 bg-gray-50 font-mono">{entry.saldo_actual}</td>
-                                            </tr>
-                                        ))}
-                                        {historial.length === 0 && (
+                                <div className="overflow-x-auto">
+                                    <table className="min-w-full divide-y divide-gray-200">
+                                        <thead className="bg-gray-50 sticky top-0 z-10">
                                             <tr>
-                                                <td colSpan={7} className="px-6 py-10 text-center text-gray-400 italic">No hay registros para este ciclo.</td>
+                                                {!selectedEmployeeOption && <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Empleado</th>}
+                                                <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Fecha</th>
+                                                <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Contrato</th>
+                                                <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Incidencia</th>
+                                                <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Tipo</th>
+                                                <th className="px-4 py-3 text-center text-xs font-bold text-gray-500 uppercase">Días</th>
+                                                <th className="px-4 py-3 text-center text-xs font-bold text-gray-500 uppercase bg-blue-50">Saldo Ant.</th>
+                                                <th className="px-4 py-3 text-center text-xs font-bold text-gray-500 uppercase bg-green-50">Saldo Act.</th>
                                             </tr>
-                                        )}
-                                    </tbody>
-                                </table>
+                                        </thead>
+                                        <tbody className="bg-white divide-y divide-gray-200">
+                                            {loadingHistorial ? (
+                                                <tr><td colSpan={8} className="px-6 py-10 text-center text-gray-500">Cargando historial global...</td></tr>
+                                            ) : filteredHistorial.map((entry, idx) => (
+                                                <tr key={idx} className="hover:bg-gray-50">
+                                                    {!selectedEmployeeOption && <td className="px-4 py-3 text-xs font-bold text-gray-700">{entry.empleado_nombre}</td>}
+                                                    <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-900">{entry.fecha}</td>
+                                                    <td className="px-4 py-3 whitespace-nowrap text-xs text-mono text-gray-500">{entry.contrato}</td>
+                                                    <td className="px-4 py-3 text-xs text-gray-500 truncate max-w-[200px]" title={entry.incidencia}>
+                                                        {entry.incidencia}
+                                                        {entry.desglose && entry.desglose !== '0.0' && (
+                                                            <div className="text-[10px] text-orange-600 font-semibold italic mt-1">
+                                                                ({entry.desglose})
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-4 py-3 whitespace-nowrap text-xs">
+                                                        <span className={`px-2 py-0.5 rounded-full font-semibold ${entry.tipo === 'Consumo' ? 'bg-red-50 text-red-700' :
+                                                            entry.tipo === 'Leyes Sociales' ? 'bg-blue-50 text-blue-700' : 'bg-gray-50 text-gray-700'
+                                                            }`}>
+                                                            {entry.tipo}
+                                                        </span>
+                                                    </td>
+                                                    <td className={`px-4 py-3 text-center text-sm font-bold ${entry.dias < 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                                        {entry.dias > 0 ? `+${entry.dias}` : entry.dias}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-center text-xs text-gray-400 font-mono">{entry.saldo_anterior}</td>
+                                                    <td className="px-4 py-3 text-center text-sm font-black text-gray-900 bg-gray-50 font-mono">{entry.saldo_actual}</td>
+                                                </tr>
+                                            ))}
+                                            {!loadingHistorial && filteredHistorial.length === 0 && (
+                                                <tr>
+                                                    <td colSpan={8} className="px-6 py-10 text-center text-gray-400 italic">No hay registros coincidentes.</td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
                             )}
                         </div>
                     </div>

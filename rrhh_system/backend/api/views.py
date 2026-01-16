@@ -297,6 +297,7 @@ class SolicitudVacacionViewSet(viewsets.ModelViewSet):
             if not hasattr(user, 'empleado'): return Response({'saldo': 0.0})
             empleado = user.empleado
 
+    def _calculate_saldo_data(self, empleado):
         # --- FILTERS BY VIGENTE ---
         filters_g = {'empleado': empleado}
         filters_s = {'empleado': empleado, 'estado': 'aprobado'}
@@ -304,7 +305,7 @@ class SolicitudVacacionViewSet(viewsets.ModelViewSet):
         if start_date:
              filters_g['fecha__gte'] = start_date
              filters_s['fecha_inicio__gte'] = start_date
-
+ 
         ganados_objs = VacacionGuardada.objects.filter(**filters_g).order_by('fecha', 'id')
         consumidos_objs = SolicitudVacacion.objects.filter(**filters_s).order_by('fecha_inicio', 'id')
         
@@ -313,6 +314,10 @@ class SolicitudVacacionViewSet(viewsets.ModelViewSet):
         total_ley_acumulado = 0
         entries = []
         
+        # FIFO Queue for VacacionGuardada to track specific remaining balances
+        # Structure: {'id': int, 'obj': obj, 'dias_orig': float, 'remanente': float}
+        queue_guardadas = []
+
         if start_date:
             from datetime import date, timedelta
             today = date.today()
@@ -324,7 +329,6 @@ class SolicitudVacacionViewSet(viewsets.ModelViewSet):
                 anios = today.year - start_date.year
                 if (today.month, today.day) < (start_date.month, start_date.day): anios -= 1
 
-            # 1. Virtual entries for anniversaries (Law)
             for i in range(1, anios + 1):
                 f_anniv = start_date + relativedelta(years=i)
                 if i >= 11: d_ley = 30
@@ -332,78 +336,211 @@ class SolicitudVacacionViewSet(viewsets.ModelViewSet):
                 else: d_ley = 15
                 total_ley_acumulado += d_ley
                 entries.append({
+                    'id': f'ley-{empleado.id}-{i}',
                     'fecha': f_anniv,
                     'tipo': 'Leyes Sociales',
                     'incidencia': f'Aniversario {i} años',
                     'dias': float(d_ley),
-                    'contrato': f"Ciclo {start_date}"
+                    'contrato': f"Ciclo {start_date}",
+                    'sort_order': 0 # Priority 0: Accrual (Morning)
                 })
 
-        # 2. Real entries (Guardadas)
         for g in ganados_objs:
-            entries.append({
+            d_val = float(g.dias)
+            entry = {
+                'id': g.id,
                 'fecha': g.fecha or g.fecha_creacion,
                 'tipo': 'Guardadas/Abono',
                 'incidencia': g.gestion or 'Carga Manual',
-                'dias': float(g.dias),
-                'contrato': f"ID-{g.contrato.id if g.contrato else 'S/C'}"
-            })
+                'dias': d_val,
+                'contrato': f"{g.contrato.id if g.contrato else 'S/C'} - {empleado.id}",
+                'sort_order': 2 # Priority 2: Deposit/Transfer In (Evening) - applied AFTER consumption
+            }
+            entries.append(entry)
+            
+            # Add to Queue if positive
+            if d_val > 0:
+                queue_guardadas.append({
+                    'id': g.id,
+                    'obj': g,
+                    'dias_orig': d_val,
+                    'remanente': d_val,
+                    'entry_ref': entry 
+                })
 
-        # 3. Consumo entries
         for s in consumidos_objs:
             entries.append({
+                'id': s.id,
                 'fecha': s.fecha_inicio,
                 'tipo': 'Consumo',
                 'incidencia': s.observacion or 'Vacaciones tomadas',
                 'dias': -float(s.dias_calculados),
-                'contrato': f"ID-{s.contrato.id if s.contrato else 'S/C'}"
+                'contrato': f"{s.contrato.id if s.contrato else 'S/C'} - {empleado.id}",
+                'sort_order': 1 # Priority 1: Consumption (Noon) - applied BEFORE new manual deposits on same day
             })
 
         # --- SORT AND COMPUTE RUNNING BALANCE ---
-        # Sort by date, then by type (give positive entries priority on same day if needed, but simple date sort first)
-        entries.sort(key=lambda x: x['fecha'])
+        # Sort by Date -> Priority (Law, Consumption, Manual) -> ID
+        entries.sort(key=lambda x: (x['fecha'], x['sort_order']))
+        
+        # Ensure queue is sorted chronologically for the causality check
+        queue_guardadas.sort(key=lambda q: (q['entry_ref']['fecha'], q['entry_ref']['sort_order']))
         
         running = 0.0
         historial = []
         
-        # Track totals for breakdown
         total_ganados_guardadas = 0.0
         total_ley_acumulado_final = 0.0
         total_consumido_historial = 0.0
+        
+        # "Pool" logic is now derived from queue processing
+        # We also need running_pool_ley for checks
+        running_pool_ley = 0.0
 
         for e in entries:
             saldo_anterior = running
             running += e['dias']
             e['saldo_anterior'] = round(saldo_anterior, 1)
             e['saldo_actual'] = round(running, 1)
+            
+            dias = float(e['dias'])
+            
+            if dias > 0:
+                if e['tipo'] == 'Leyes Sociales':
+                    running_pool_ley += dias
+                    total_ley_acumulado_final += dias
+                else: 
+                    total_ganados_guardadas += dias
+                e['desglose'] = None
+                
+            else:
+                consumo = abs(dias)
+                total_consumido_historial += consumo
+                
+                # FIFO DEQUE from queue_guardadas
+                needed = consumo
+                used_guardadas = 0.0
+                
+                for q_item in queue_guardadas:
+                    if needed <= 0: break
+                    
+                    # Check Causality: Don't consume items that are in the future relative to this event
+                    # Or items on the same day that are "ranked" later (e.g. Deposit after Consumption)
+                    q_date = q_item['entry_ref']['fecha']
+                    q_order = q_item['entry_ref']['sort_order']
+                    curr_date = e['fecha']
+                    curr_order = e['sort_order']
+                    
+                    if q_date > curr_date: break # Queue is sorted by date, so we can break
+                    if q_date == curr_date and q_order > curr_order: continue # Same day, but happens later
+                    
+                    if q_item['remanente'] > 0:
+                        take = min(q_item['remanente'], needed)
+                        q_item['remanente'] -= take
+                        needed -= take
+                        used_guardadas += take
+                
+                # Remainder comes from Ley
+                used_ley = needed # If needed is still > 0, it means we exhausted guardadas
+                running_pool_ley -= used_ley
+                
+                parts = []
+                if used_guardadas > 0: parts.append(f"{float(round(used_guardadas, 1))} Guardada")
+                if used_ley > 0: parts.append(f"{float(round(used_ley, 1))} Vacación")
+                
+                e['desglose'] = ", ".join(parts) if parts else "0.0"
+                e['consumo_guardadas'] = float(round(used_guardadas, 1))
+                e['consumo_ley'] = float(round(used_ley, 1))
+
+            # Snapshot of TOTAL saved balance (sum of all remanentes)
+            current_saved_balance = sum(q['remanente'] for q in queue_guardadas)
+            e['saldo_guardadas_pos_movimiento'] = float(round(current_saved_balance, 1))
             historial.append(e)
 
-            if e['dias'] > 0:
-                if e['tipo'] == 'Leyes Sociales':
-                    total_ley_acumulado_final += e['dias']
-                else:
-                    total_ganados_guardadas += e['dias']
-            else:
-                total_consumido_historial += abs(e['dias'])
+        # Correct calculation based on actual simulation state
+        final_saldo_guardadas = sum(q['remanente'] for q in queue_guardadas)
+        final_saldo_ley = running - final_saldo_guardadas
 
-        # Tiered consumption for breakdown display (Guardadas first, then Ley)
-        # This logic matches the original requirement: consume from Guardadas first
-        consumo_desde_guardadas = min(total_consumido_historial, total_ganados_guardadas)
-        saldo_guardadas = total_ganados_guardadas - consumo_desde_guardadas
-        
-        consumo_restante = total_consumido_historial - consumo_desde_guardadas
-        saldo_ley = total_ley_acumulado_final - consumo_restante
-
-        return Response({
+        return {
             'saldo': round(running, 1),
-            'saldo_guardadas': round(saldo_guardadas, 1),
-            'saldo_ley': round(saldo_ley, 1),
-            'dias_ganados': round(total_ganados_guardadas, 1), # Only manual/saved entries
+            'saldo_guardadas': round(final_saldo_guardadas, 1),
+            'saldo_ley': round(final_saldo_ley, 1),
+            'dias_ganados': round(total_ganados_guardadas, 1),
             'historial': historial,
             'antiguedad_detalle': f"{anios} años, {meses} meses, {dias} días",
             'fecha_ingreso_vigente': start_date,
-            'vacacion_por_ley': total_ley_acumulado # Total accrued law days
-        })
+            'vacacion_por_ley': total_ley_acumulado,
+            'queue_guardadas_status': queue_guardadas # Return the status for the specific view
+        }
+
+    @action(detail=False, methods=['get'])
+    def saldo(self, request):
+        empleado_id = request.query_params.get('empleado_id')
+        user = request.user
+        if empleado_id:
+            if not (user.is_superuser or user.groups.filter(name__in=['Admin', 'RRHH', 'Jefe de Departamento']).exists()):
+                 return Response({'error': 'No tienes permiso.'}, status=403)
+            try: empleado = Empleado.objects.get(pk=empleado_id)
+            except Empleado.DoesNotExist: return Response({'error': 'No existe.'}, status=404)
+        else:
+            if not hasattr(user, 'empleado'): return Response({'saldo': 0.0})
+            empleado = user.empleado
+
+        data = self._calculate_saldo_data(empleado)
+        # Remove internal object ref before serializing
+        if 'queue_guardadas_status' in data:
+            for q in data['queue_guardadas_status']:
+                if 'obj' in q: del q['obj']
+                if 'entry_ref' in q: del q['entry_ref']
+        return Response(data)
+
+    @action(detail=False, methods=['get'])
+    def global_ledger(self, request):
+        if not (request.user.is_superuser or request.user.groups.filter(name__in=['Admin', 'RRHH']).exists()):
+            return Response({'error': 'No tienes permiso.'}, status=403)
+
+        employees = Empleado.objects.all()
+        global_items = []
+
+        for emp in employees:
+            data = self._calculate_saldo_data(emp)
+            emp_name = f"{emp.nombres} {emp.apellido_paterno} {emp.apellido_materno or ''}".strip()
+            
+            # Here we ONLY use the Queue Status which represents "Active Saved Vacations"
+            queue = data.get('queue_guardadas_status', [])
+            
+            for item in queue:
+                # Filter: Only show items with Remaining Days > 0
+                if item['remanente'] > 0:
+                    global_items.append({
+                        'id': item['id'],
+                        'uniq_key': f"G-{item['id']}",
+                        'type': 'guardada',
+                        'empleado': emp.id,
+                        'empleado_nombre': emp_name,
+                        'fecha': item['obj'].fecha or item['obj'].fecha_creacion, # Access original obj before deletion above? No, we need to be careful.
+                        # Wait, obj is in the dict inside _calculate_saldo_data but we need to safely access it here.
+                        # The 'obj' key exists in the raw return from _calculate_saldo_data (before serialization cleanup in 'saldo').
+                        'detalle': item['obj'].gestion or 'Ajuste Manual',
+                        'abono': item['dias_orig'], # Show original? Or show remaining? User said "ir editando". 
+                        # User example: shows "1" (remaining).
+                        # Let's send "dias" as remaining.
+                        'dias': item['remanente'], 
+                        'dias_originales': item['dias_orig'],
+                        'saldo_calculado': item['remanente'], # Redundant but fits interface
+                        'original_item': {
+                            'id': item['id'],
+                            'dias': item['remanente'], # For editing, we might want to know this
+                            'gestion': item['obj'].gestion,
+                            'fecha': item['obj'].fecha,
+                            'empleado': emp.id
+                        }
+                    })
+        
+        # Sort globally
+        global_items.sort(key=lambda x: (x['empleado_nombre'], x['fecha']))
+        
+        return Response(global_items)
 
     @action(detail=False, methods=['post'])
     def liquidar(self, request):
@@ -412,7 +549,7 @@ class SolicitudVacacionViewSet(viewsets.ModelViewSet):
             
         data = request.data
         empleado_id = data.get('empleado_id')
-        nueva_fecha = data.get('nueva_fecha')
+        fecha_accion = data.get('nueva_fecha') or str(date.today())
         dias_pagar = float(data.get('dias_pagar', 0))
         dias_guardar = float(data.get('dias_guardar', 0))
 
@@ -421,30 +558,55 @@ class SolicitudVacacionViewSet(viewsets.ModelViewSet):
         except Empleado.DoesNotExist:
             return Response({'error': 'Empleado no existe.'}, status=404)
 
-        from datetime import datetime, timedelta
-        nueva_dt = datetime.strptime(nueva_fecha, '%Y-%m-%d').date()
-        fecha_cierre = nueva_dt - timedelta(days=1)
+        from datetime import datetime
+        fecha_dt = datetime.strptime(fecha_accion, '%Y-%m-%d').date()
 
         with transaction.atomic():
-            # 1. Cierre (negativos)
+            # 1. Vacación Pagada (Consumo)
             if dias_pagar > 0:
-                VacacionGuardada.objects.create(
-                    empleado=empleado, dias=-dias_pagar, 
-                    fecha=fecha_cierre, gestion="Vacaciones Pagadas (Cierre)"
+                SolicitudVacacion.objects.create(
+                    empleado=empleado,
+                    dias_calculados=dias_pagar,
+                    fecha_inicio=fecha_dt,
+                    fecha_fin=fecha_dt,
+                    observacion="Liquidación - Vacación Pagada",
+                    estado='aprobado',
+                    fecha_aprobacion=timezone.now(),
+                    aprobador=request.user.empleado if hasattr(request.user, 'empleado') else None
                 )
+
+            # 2. Traspaso (Consumo del saldo actual + Entrada a Guardadas)
             if dias_guardar > 0:
-                VacacionGuardada.objects.create(
-                    empleado=empleado, dias=-dias_guardar, 
-                    fecha=fecha_cierre, gestion="Traspaso (Salida)"
+                # Salida de la bolsa actual (Consumo)
+                SolicitudVacacion.objects.create(
+                    empleado=empleado,
+                    dias_calculados=dias_guardar,
+                    fecha_inicio=fecha_dt,
+                    fecha_fin=fecha_dt,
+                    observacion="Liquidación - Traspaso a Guardadas",
+                    estado='aprobado',
+                    fecha_aprobacion=timezone.now(),
+                    aprobador=request.user.empleado if hasattr(request.user, 'empleado') else None
                 )
-                # 2. Apertura
+                
+                # Entrada a la bolsa de Guardadas
                 VacacionGuardada.objects.create(
-                    empleado=empleado, dias=dias_guardar, 
-                    fecha=nueva_dt, gestion="Saldo Inicial (Traspaso)"
+                    empleado=empleado, 
+                    dias=dias_guardar, 
+                    fecha=fecha_dt, 
+                    gestion="Traspaso de Antiguos Saldos"
                 )
             
-            # 3. Reset
-            empleado.fecha_ingreso_vigente = nueva_dt
+            # 3. Finalizar Contrato Vigente
+            active_contracts = empleado.contratos.filter(estado_contrato='vigente')
+            for c in active_contracts:
+                c.estado_contrato = 'finalizado'
+                c.fecha_fin = fecha_dt
+                c.save()
+            
+            # 4. Desactivar Empleado (RRHH debe reactivarlo manualmente)
+            empleado.estado = 'inactivo'
+            # NO cambiamos fecha_ingreso_vigente para mantener el histórico visible
             empleado.save()
 
         return Response({'status': 'ok'})
