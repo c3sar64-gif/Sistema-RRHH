@@ -23,7 +23,7 @@ export const AppLayout: React.FC = () => {
   const canManageCore = isAdmin || isRRHH;
 
   return (
-    <div className="flex h-screen bg-gray-200 font-sans print:h-auto print:overflow-visible print:bg-white">
+    <div className="flex h-screen bg-gray-200 font-sans print:block print:h-auto print:overflow-visible print:bg-white">
       {/* Sidebar */}
       <div className="hidden md:flex flex-col w-64 bg-gray-800 print:hidden">
         <div className="flex items-center justify-center h-20 shadow-md">

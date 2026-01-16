@@ -2,22 +2,58 @@
 @tailwind components;
 @tailwind utilities;
 
+/* --- UTILITIES VISIBILIDAD DE IMPRESIÓN --- */
+
+/* Clase para ocultar vistas de impresión en pantalla normal */
+.print-view {
+    display: none;
+}
+
 @media print {
 
-    html,
-    body,
-    #root {
-        height: auto !important;
-        min-height: auto !important;
-        overflow: visible !important;
-        background: white !important;
+    /* Regla Nuclear: Ocultar todo por defecto usando visibility */
+    /* Esto mantiene el layout pero hace invisible el contenido externo */
+    body * {
+        visibility: hidden;
     }
 
-    /* Esconder elementos que no sean del área de impresión si es necesario,
-     pero por ahora confiamos en las clases print:hidden */
+    /* Resetear márgenes y fondos */
+    html,
+    body {
+        background: white !important;
+        height: auto !important;
+        overflow: visible !important;
+    }
 
-    /* Asegurar que el contenido principal sea visible */
-    #root {
+    /* Habilitar SOLO la sección de impresión específica */
+    /* Debe tener id="print-section" o clase "printable-area" */
+    #print-section,
+    #print-section *,
+    .printable-area,
+    .printable-area * {
+        visibility: visible !important;
+    }
+
+    #print-section,
+    .printable-area {
         display: block !important;
+        position: absolute !important;
+        left: 0 !important;
+        top: 0 !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: white !important;
+        z-index: 9999 !important;
+    }
+
+    /* Ocultar explícitamente elementos de pantalla */
+    .screen-view {
+        display: none !important;
+    }
+
+    img {
+        max-width: 100% !important;
+        page-break-inside: avoid !important;
     }
 }

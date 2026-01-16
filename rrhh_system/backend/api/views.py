@@ -5,7 +5,10 @@ from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from django.contrib.auth.models import User, Group
 from django.db import transaction, models
+from django.db import transaction, models
 from django.utils import timezone
+from django.conf import settings
+from .services import send_whatsapp_message
 import json
 
 from .models import (
@@ -177,8 +180,42 @@ class PermisoViewSet(viewsets.ModelViewSet):
         else:
             if not hasattr(user, 'empleado'): raise PermissionDenied("No tienes un perfil de empleado.")
             empleado = user.empleado
+        
         aprobador = empleado.jefe
-        serializer.save(empleado=empleado, aprobador_asignado=aprobador)
+        permiso = serializer.save(empleado=empleado, aprobador_asignado=aprobador)
+
+        # --- Enviar Notificación al Jefe de Departamento vía WhatsApp ---
+        print(f"DEBUG_NOTIF: Iniciando proceso de notificación para {empleado}")
+        try:
+            if not empleado.departamento:
+                print("DEBUG_NOTIF: Empleado no tiene departamento asignado.")
+            elif not empleado.departamento.jefe_departamento:
+                print(f"DEBUG_NOTIF: El departamento {empleado.departamento.nombre} no tiene Jefe asignado.")
+            else:
+                jefe_depto = empleado.departamento.jefe_departamento
+                print(f"DEBUG_NOTIF: Jefe encontrado: {jefe_depto}")
+                
+                if jefe_depto.id == empleado.id:
+                    print("DEBUG_NOTIF: El solicitante es el mismo jefe. No se envía mensaje.")
+                elif not jefe_depto.celular:
+                    print(f"DEBUG_NOTIF: El jefe {jefe_depto} no tiene número de celular registrado.")
+                else: 
+                    print(f"DEBUG_NOTIF: Intentando enviar mensaje a {jefe_depto.celular}")
+                    message = f"""*Nueva Solicitud de Permiso* 📋
+
+Solicitante: {empleado}
+Depto: {empleado.departamento.nombre}
+Tipo: {permiso.get_tipo_permiso_display()}
+Horario: {permiso.hora_salida} - {permiso.hora_regreso}
+Motivo: {permiso.observacion or 'Sin observaciones'}
+
+_Por favor, ingrese al sistema para aprobar o rechazar._"""
+                    
+                    send_whatsapp_message(jefe_depto.celular, message)
+                    
+        except Exception as e:
+            # No detener el flujo si falla la notificación
+            print(f"DEBUG_NOTIF: Error CRITICO en notificación WhatsApp: {e}")
 
     @action(detail=True, methods=['post'])
     def approve(self, request, pk=None):

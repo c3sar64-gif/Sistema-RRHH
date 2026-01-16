@@ -146,3 +146,23 @@ REST_FRAMEWORK = {
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+# --- Email Configuration ---
+# For development, print emails to console
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+
+# For production (Example - User must fill this)
+# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+# EMAIL_HOST = 'smtp.gmail.com'
+# EMAIL_PORT = 587
+# EMAIL_USE_TLS = True
+# EMAIL_HOST_USER = 'tu_correo@gmail.com'
+# EMAIL_HOST_PASSWORD = 'tu_contraseña_de_aplicacion'
+DEFAULT_FROM_EMAIL = 'rrhh@avicolarolon.com'
+
+# --- WhatsApp Configuration ---
+# https://developers.facebook.com/
+WHATSAPP_API_URL = 'https://graph.facebook.com/v22.0'
+WHATSAPP_TOKEN = 'EAAb2nFjASUgBQQiurdny2UwpxQmvtbFndRZCG2FOEV1k1TGdLz7Fswcj9dd5SRRvbNzUaF6JDbY7MZAvBAZCNu7mQqnEv1REayIZBy0jSpHkJZCdSDyRFCnYcFS2QQFHLZAf2aFLqlYGvU9QwTokpP9UNkv4gzwRq7zNqhD3p9ZBqAAL4rWfH9PtNm49zkCUZAdHrci0cBxeiMLcelO9IZBM0fZBc858ZCReyJDVEEPsdIRYp0pQIP9ZCgp0DeOdgWE5zY2eExozio6D6khhJcvQ6W8cpAZDZD'
+WHATSAPP_PHONE_ID = '984108238113553'
+
