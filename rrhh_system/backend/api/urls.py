@@ -4,7 +4,7 @@ from .views import (
     UserCreate, EmpleadoViewSet, DepartamentoViewSet, CargoViewSet,
     FamiliarViewSet, EstudioViewSet, ContratoViewSet, get_current_user, UserViewSet,
     JefesDepartamentoListView, PermisoViewSet, HoraExtraViewSet,
-    SolicitudVacacionViewSet, VacacionGuardadaViewSet
+    SolicitudVacacionViewSet, VacacionGuardadaViewSet, PasswordResetRequestView
 )
 
 # Create a router and register our viewsets with it.
@@ -26,5 +26,7 @@ urlpatterns = [
     path('jefes-departamento/', JefesDepartamentoListView.as_view(), name='jefes-departamento-list'),
     path('register/', UserCreate.as_view(), name='user-create'),
     path('me/', get_current_user, name='current-user'),
+    path('password_reset/', PasswordResetRequestView.as_view(), name='password_reset_request'),
+    path('', include('django.contrib.auth.urls')), # This adds: password_reset_confirm, password_reset_complete, etc.
     path('', include(router.urls)),
 ]

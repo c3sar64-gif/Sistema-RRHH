@@ -149,15 +149,15 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 # --- Email Configuration ---
 # For development, print emails to console
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+# EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
-# For production (Example - User must fill this)
-# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-# EMAIL_HOST = 'smtp.gmail.com'
-# EMAIL_PORT = 587
-# EMAIL_USE_TLS = True
-# EMAIL_HOST_USER = 'tu_correo@gmail.com'
-# EMAIL_HOST_PASSWORD = 'tu_contraseña_de_aplicacion'
+# For production (Gmail SMTP)
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'app.rolon.bolivia@gmail.com'
+EMAIL_HOST_PASSWORD = 'yjmo ouug loey rhrb' # App Password
 DEFAULT_FROM_EMAIL = 'rrhh@avicolarolon.com'
 
 # --- WhatsApp Configuration ---

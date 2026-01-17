@@ -1,4 +1,4 @@
-from rest_framework import viewsets, generics, status, filters
+from rest_framework import viewsets, generics, status, filters, serializers
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.decorators import action, api_view, permission_classes
@@ -23,6 +23,30 @@ from .serializers import (
 )
 from .permissions import IsAdminUser, IsStaffUser
 from .pagination import OptionalPagination
+from django.contrib.auth.forms import PasswordResetForm
+
+class PasswordResetRequestView(generics.GenericAPIView):
+    permission_classes = [AllowAny]
+    serializer_class = serializers.Serializer # Dummy serializer to avoid error
+
+    def post(self, request):
+        email = request.data.get('email')
+        if not email:
+            return Response({'error': 'El correo electrónico es requerido.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        form = PasswordResetForm({'email': email})
+        if form.is_valid():
+            # opts dict can configure domain_override, subject_template_name, etc.
+            # For now, default is fine.
+            form.save(
+                request=request, 
+                use_https=request.is_secure(),
+                email_template_name='registration/password_reset_email.html', # Django defaults, but ensuring
+            )
+            return Response({'message': 'Si el correo existe, se ha enviado un enlace de recuperación.'}, status=status.HTTP_200_OK)
+        
+        return Response(form.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all().order_by('username')
@@ -31,6 +55,12 @@ class UserViewSet(viewsets.ModelViewSet):
 
     def partial_update(self, request, *args, **kwargs):
         instance = self.get_object()
+        
+        # Primero actualizamos los campos estándar (email, username, etc.)
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+
         role_name = request.data.get('role')
         with transaction.atomic():
             if role_name:
@@ -43,11 +73,13 @@ class UserViewSet(viewsets.ModelViewSet):
             
             if 'empleado_id' in request.data:
                 empleado_id = request.data.get('empleado_id')
+                # Desvincular anterior si existe
                 if hasattr(instance, 'empleado') and instance.empleado:
                     old_empleado = instance.empleado
                     old_empleado.user = None
                     old_empleado.save()
                 
+                # Vincular nuevo
                 if empleado_id: 
                     try:
                         empleado = Empleado.objects.get(id=empleado_id)
@@ -58,6 +90,8 @@ class UserViewSet(viewsets.ModelViewSet):
                     except Exception as e:
                          return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
+        # Refrescamos y devolvemos la data actualizada
+        instance.refresh_from_db()
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
 

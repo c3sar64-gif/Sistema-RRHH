@@ -145,9 +145,6 @@ export const LoginPage: React.FC = () => {
                 <label className="text-sm font-semibold text-gray-700" htmlFor="password">
                   Contraseña
                 </label>
-                <Link to="/recuperar-contrasena" className="text-sm font-medium text-indigo-600 hover:text-indigo-500">
-                  ¿Olvidaste tu contraseña?
-                </Link>
               </div>
               <div className="relative">
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
@@ -173,6 +170,11 @@ export const LoginPage: React.FC = () => {
                     <EyeIcon className="h-5 w-5" />
                   )}
                 </button>
+              </div>
+              <div className="text-right mt-2">
+                <Link to="/recuperar-contrasena" className="text-sm font-medium text-indigo-600 hover:text-indigo-500">
+                  ¿Olvidaste tu contraseña?
+                </Link>
               </div>
             </div>
 
