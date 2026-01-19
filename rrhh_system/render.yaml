@@ -1,6 +1,7 @@
 services:
   - type: web
     name: rrhh-backend
+    # Configuración de despliegue para Render
     env: python
     region: ohio
     plan: free
