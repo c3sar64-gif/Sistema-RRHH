@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
 from pathlib import Path
+from decouple import config, Csv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -20,12 +21,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-tf#5p6pi2%6k*0-#bo9x1orxp)!0o^t2cmqt=j2!sfssh0n$qr'
+SECRET_KEY = config('SECRET_KEY', default='django-insecure-unsafe-default-key')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = config('DEBUG', default=False, cast=bool)
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=Csv())
 
 
 # Application definition
@@ -45,6 +46,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -77,15 +79,17 @@ WSGI_APPLICATION = 'rrhh_backend.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
+# Database
+# https://docs.djangoproject.com/en/6.0/ref/settings/#databases
+
+import dj_database_url
+
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'SistemaRRHH',
-        'USER': 'postgres',
-        'PASSWORD': 'admin123',
-        'HOST': '127.0.0.1', # Using IP address instead of 'localhost' can sometimes resolve connection issues
-        'PORT': '5432',
-    }
+    'default': dj_database_url.config(
+        default=config('DATABASE_URL'),
+        conn_max_age=600,
+        ssl_require=True
+    )
 }
 
 
@@ -124,6 +128,8 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:5173',
@@ -156,13 +162,13 @@ EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'app.rolon.bolivia@gmail.com'
-EMAIL_HOST_PASSWORD = 'yjmo ouug loey rhrb' # App Password
+EMAIL_HOST_USER = config('EMAIL_HOST_USER')
+EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD') # App Password
 DEFAULT_FROM_EMAIL = 'rrhh@avicolarolon.com'
 
 # --- WhatsApp Configuration ---
 # https://developers.facebook.com/
 WHATSAPP_API_URL = 'https://graph.facebook.com/v22.0'
-WHATSAPP_TOKEN = 'EAAb2nFjASUgBQYhzGcPhnZBuY2MVPZCRO05RJ4PZBPLbZAzpkevPvZCovOY8CfQheB5xMOYyZB9MIKlBbja4Fo1vc9FMiZCbExIqt2VlaC4OytLAcLnIx4j4dnbB9KC9H90LXuUarEPHek5ia8SIhjAMZAiiYPyy2sQpibZASZCw3pjnuZAS1Ac7bRYtiwa1j90mAZDZD'
-WHATSAPP_PHONE_ID = '979242931933281'
+WHATSAPP_TOKEN = config('WHATSAPP_TOKEN')
+WHATSAPP_PHONE_ID = config('WHATSAPP_PHONE_ID')
 

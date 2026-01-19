@@ -10,6 +10,7 @@ import moment from 'moment';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import { SearchableSelect } from '../components/SearchableSelect';
 import './CalendarOverrides.css';
+import { API_URL } from '../config';
 
 import 'moment/dist/locale/es'; // Import Spanish locale
 
@@ -147,7 +148,7 @@ export const PermisosPage: React.FC = () => {
         setLoading(true);
         try {
             // Always fetch permises
-            const permisosRes = await axios.get('http://127.0.0.1:8000/api/permisos/?no_pagination=true', { headers: { 'Authorization': `Token ${token}` } });
+            const permisosRes = await axios.get(`${API_URL}/api/permisos/?no_pagination=true`, { headers: { 'Authorization': `Token ${token}` } });
 
             const fetchedPermisos = permisosRes.data.results || permisosRes.data;
             setPermisos(fetchedPermisos);
@@ -170,9 +171,9 @@ export const PermisosPage: React.FC = () => {
             // Conditional fetch for Admin/HR/Encargado/Porteria data
             if (canViewAll) {
                 const [departmentsRes, jefesRes, employeesRes] = await Promise.all([
-                    axios.get('http://127.0.0.1:8000/api/departamentos/?no_pagination=true', { headers: { 'Authorization': `Token ${token}` } }),
-                    axios.get('http://127.0.0.1:8000/api/jefes-departamento/', { headers: { 'Authorization': `Token ${token}` } }),
-                    axios.get('http://127.0.0.1:8000/api/empleados/?no_pagination=true', { headers: { 'Authorization': `Token ${token}` } }),
+                    axios.get(`${API_URL}/api/departamentos/?no_pagination=true`, { headers: { 'Authorization': `Token ${token}` } }),
+                    axios.get(`${API_URL}/api/jefes-departamento/`, { headers: { 'Authorization': `Token ${token}` } }),
+                    axios.get(`${API_URL}/api/empleados/?no_pagination=true`, { headers: { 'Authorization': `Token ${token}` } }),
                 ]);
                 setAllDepartments(departmentsRes.data);
                 setAllJefes(jefesRes.data);
@@ -254,7 +255,7 @@ export const PermisosPage: React.FC = () => {
 
         try {
             setIsSaving(true);
-            await axios.post('http://127.0.0.1:8000/api/permisos/', dataToSubmit, { headers: { 'Authorization': `Token ${token}` } });
+            await axios.post(`${API_URL}/api/permisos/`, dataToSubmit, { headers: { 'Authorization': `Token ${token}` } });
             alert('Permiso creado con éxito!');
             setIsModalOpen(false);
             setFormState(initialFormState);
@@ -270,7 +271,7 @@ export const PermisosPage: React.FC = () => {
 
     const handleUpdateStatus = async (id: number, newStatus: string) => {
         try {
-            await axios.patch(`http://127.0.0.1:8000/api/permisos/${id}/`, { estado: newStatus }, { headers: { 'Authorization': `Token ${token}` } });
+            await axios.patch(`${API_URL}/api/permisos/${id}/`, { estado: newStatus }, { headers: { 'Authorization': `Token ${token}` } });
             setPermisos(prev => prev.map(p => p.id === id ? { ...p, estado: newStatus } : p));
             setCalendarEvents(prev => prev.map(e => e.id === id ? { ...e, resource: { ...e.resource, estado: newStatus } } : e));
 

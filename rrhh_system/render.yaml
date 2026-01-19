@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: rrhh-backend
+    env: python
+    region: ohio
+    plan: free
+    buildCommand: |
+      cd backend
+      pip install -r requirements.txt
+      python manage.py collectstatic --noinput
+    startCommand: |
+      cd backend
+      gunicorn rrhh_backend.wsgi:application
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.10.0
+      - key: SECRET_KEY
+        generateValue: true
+      - key: WEB_CONCURRENCY
+        value: 4
+    autoDeploy: false

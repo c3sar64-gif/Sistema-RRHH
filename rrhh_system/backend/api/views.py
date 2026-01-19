@@ -21,7 +21,66 @@ from .serializers import (
     JefeSerializer, PermisoSerializer, HoraExtraSerializer,
     SolicitudVacacionSerializer, VacacionGuardadaSerializer
 )
-from .permissions import IsAdminUser, IsStaffUser
+from .permissions import IsAdminUser, IsStaffUser, IsStaffReadOnly
+from .pagination import OptionalPagination
+from django.contrib.auth.forms import PasswordResetForm
+
+# ... (omitted code) ...
+
+class EmpleadoViewSet(viewsets.ModelViewSet):
+    queryset = Empleado.objects.all().order_by('nombres', 'apellido_paterno', 'apellido_materno')
+    serializer_class = EmpleadoSerializer
+    parser_classes = (MultiPartParser, FormParser)
+    permission_classes = [IsStaffReadOnly]
+    pagination_class = OptionalPagination
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['nombres', 'apellido_paterno', 'apellido_materno', 'ci']
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        return qs
+
+    def _prepare_data_from_request(self, request):
+        data = {k: v for k, v in request.POST.items()}
+        def clean_empty_strings(obj):
+            if isinstance(obj, list): return [clean_empty_strings(i) for i in obj]
+            if isinstance(obj, dict): return {k: (None if v == "" else clean_empty_strings(v)) for k, v in obj.items()}
+            return obj
+        def parse_json(key):
+            val = request.POST.get(key)
+            if val and isinstance(val, str):
+                try: return clean_empty_strings(json.loads(val))
+                except json.JSONDecodeError: return []
+            return None
+        for field in ['familiares', 'estudios', 'contratos']:
+            parsed = parse_json(f'{field}_json')
+            if parsed is not None: data[field] = parsed
+        for key in ['familiares_json', 'estudios_json', 'contratos_json', 'cargo_nombre', 'departamento_nombre', 'jefe_info']:
+            if key in data: data.pop(key)
+        for key, file in request.FILES.items(): data[key] = file
+        return data
+
+    def create(self, request, *args, **kwargs):
+        data = self._prepare_data_from_request(request)
+        serializer = self.get_serializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    def partial_update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        data = self._prepare_data_from_request(request)
+        serializer = self.get_serializer(instance, data=data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        return Response(serializer.data)
+
+        # Refrescamos y devolvemos la data actualizada
+        instance.refresh_from_db()
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
+
+from .permissions import IsAdminUser, IsStaffUser, IsStaffReadOnly
 from .pagination import OptionalPagination
 from django.contrib.auth.forms import PasswordResetForm
 
@@ -46,7 +105,6 @@ class PasswordResetRequestView(generics.GenericAPIView):
             return Response({'message': 'Si el correo existe, se ha enviado un enlace de recuperación.'}, status=status.HTTP_200_OK)
         
         return Response(form.errors, status=status.HTTP_400_BAD_REQUEST)
-
 
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all().order_by('username')
@@ -106,58 +164,10 @@ class JefesDepartamentoListView(generics.ListAPIView):
     permission_classes = [IsStaffUser]
     pagination_class = None
 
-class EmpleadoViewSet(viewsets.ModelViewSet):
-    queryset = Empleado.objects.all().order_by('nombres', 'apellido_paterno', 'apellido_materno')
-    serializer_class = EmpleadoSerializer
-    parser_classes = (MultiPartParser, FormParser)
-    permission_classes = [IsStaffUser]
-    pagination_class = OptionalPagination
-    filter_backends = [filters.SearchFilter]
-    search_fields = ['nombres', 'apellido_paterno', 'apellido_materno', 'ci']
-
-    def get_queryset(self):
-        qs = super().get_queryset()
-        return qs
-
-    def _prepare_data_from_request(self, request):
-        data = {k: v for k, v in request.POST.items()}
-        def clean_empty_strings(obj):
-            if isinstance(obj, list): return [clean_empty_strings(i) for i in obj]
-            if isinstance(obj, dict): return {k: (None if v == "" else clean_empty_strings(v)) for k, v in obj.items()}
-            return obj
-        def parse_json(key):
-            val = request.POST.get(key)
-            if val and isinstance(val, str):
-                try: return clean_empty_strings(json.loads(val))
-                except json.JSONDecodeError: return []
-            return None
-        for field in ['familiares', 'estudios', 'contratos']:
-            parsed = parse_json(f'{field}_json')
-            if parsed is not None: data[field] = parsed
-        for key in ['familiares_json', 'estudios_json', 'contratos_json', 'cargo_nombre', 'departamento_nombre', 'jefe_info']:
-            if key in data: data.pop(key)
-        for key, file in request.FILES.items(): data[key] = file
-        return data
-
-    def create(self, request, *args, **kwargs):
-        data = self._prepare_data_from_request(request)
-        serializer = self.get_serializer(data=data)
-        serializer.is_valid(raise_exception=True)
-        self.perform_create(serializer)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
-
-    def partial_update(self, request, *args, **kwargs):
-        instance = self.get_object()
-        data = self._prepare_data_from_request(request)
-        serializer = self.get_serializer(instance, data=data, partial=True)
-        serializer.is_valid(raise_exception=True)
-        self.perform_update(serializer)
-        return Response(serializer.data)
-
 class DepartamentoViewSet(viewsets.ModelViewSet):
     queryset = Departamento.objects.all().order_by('nombre')
     serializer_class = DepartamentoSerializer
-    permission_classes = [IsStaffUser]
+    permission_classes = [IsStaffReadOnly]
     pagination_class = OptionalPagination
     filter_backends = [filters.SearchFilter]
     search_fields = ['nombre']
@@ -165,7 +175,7 @@ class DepartamentoViewSet(viewsets.ModelViewSet):
 class CargoViewSet(viewsets.ModelViewSet):
     queryset = Cargo.objects.all().order_by('nombre')
     serializer_class = CargoSerializer
-    permission_classes = [IsStaffUser]
+    permission_classes = [IsStaffReadOnly]
     pagination_class = OptionalPagination
     filter_backends = [filters.SearchFilter]
     search_fields = ['nombre']

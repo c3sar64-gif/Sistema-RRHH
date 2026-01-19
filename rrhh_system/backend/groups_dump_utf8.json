@@ -1,0 +1,50 @@
+[
+{
+  "model": "auth.group",
+  "pk": 1,
+  "fields": {
+    "name": "Admin",
+    "permissions": []
+  }
+},
+{
+  "model": "auth.group",
+  "pk": 2,
+  "fields": {
+    "name": "RRHH",
+    "permissions": []
+  }
+},
+{
+  "model": "auth.group",
+  "pk": 3,
+  "fields": {
+    "name": "Encargado",
+    "permissions": []
+  }
+},
+{
+  "model": "auth.group",
+  "pk": 4,
+  "fields": {
+    "name": "Empleado",
+    "permissions": []
+  }
+},
+{
+  "model": "auth.group",
+  "pk": 5,
+  "fields": {
+    "name": "Jefe de Departamento",
+    "permissions": []
+  }
+},
+{
+  "model": "auth.group",
+  "pk": 6,
+  "fields": {
+    "name": "Porteria",
+    "permissions": []
+  }
+}
+]

@@ -1,6 +1,7 @@
 // src/AuthContext.tsx
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import axios from 'axios';
+import { API_URL } from './config';
 
 // Definir la estructura del objeto de usuario
 interface User {
@@ -32,7 +33,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const fetchUser = async () => {
       if (token) {
         try {
-          const response = await axios.get('http://127.0.0.1:8000/api/me/', {
+          const response = await axios.get(`${API_URL}/api/me/`, {
             headers: {
               'Authorization': `Token ${token}`
             }
