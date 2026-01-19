@@ -133,7 +133,9 @@ export const EmployeePage: React.FC = () => {
       </div>
 
       <div className="bg-white p-6 rounded-lg shadow-md">
-        <div className="overflow-x-auto">
+
+        {/* Vista Escritorio (Tabla) */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
@@ -169,6 +171,36 @@ export const EmployeePage: React.FC = () => {
             </tbody>
           </table>
         </div>
+
+        {/* Vista Móvil (Tarjetas) */}
+        <div className="md:hidden grid grid-cols-1 gap-4">
+          {employees.map((emp) => (
+            <div key={emp.id} className="bg-gray-50 p-4 rounded-lg border border-gray-200 shadow-sm flex flex-col gap-3">
+              <div className="flex justify-between items-start">
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">{`${emp.nombres} ${emp.apellido_paterno}`}</h3>
+                  <p className="text-sm text-gray-500">{emp.cargo_nombre}</p>
+                </div>
+                <span className={`px-2 py-1 text-xs font-semibold rounded-full ${emp.estado === 'activo' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                  {emp.estado ? (emp.estado.charAt(0).toUpperCase() + emp.estado.slice(1)) : 'Activo'}
+                </span>
+              </div>
+
+              <div className="text-sm text-gray-600 space-y-1">
+                <p><span className="font-semibold">CI:</span> {emp.ci}</p>
+                <p><span className="font-semibold">Depto:</span> {emp.departamento_nombre}</p>
+                <p><span className="font-semibold">Celular:</span> {emp.celular || 'N/A'}</p>
+              </div>
+
+              <div className="flex justify-end gap-3 mt-2 border-t border-gray-200 pt-2">
+                <button onClick={() => navigate(`/empleados/ver/${emp.id}`)} className="text-gray-600 font-medium text-sm">Ver</button>
+                <button onClick={() => navigate(`/empleados/editar/${emp.id}`)} className="text-indigo-600 font-medium text-sm">Editar</button>
+                <button onClick={() => handleDelete(emp.id)} className="text-red-600 font-medium text-sm">Eliminar</button>
+              </div>
+            </div>
+          ))}
+        </div>
+
         <div className="mt-4 flex justify-between items-center">
           <button
             onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}

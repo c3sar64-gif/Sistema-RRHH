@@ -49,13 +49,15 @@ export const EmployeeFormPage: React.FC = () => {
   const [cargos, setCargos] = useState<Option[]>([]);
   const [departamentos, setDepartamentos] = useState<Option[]>([]);
   const [jefes, setJefes] = useState<EmpleadoSimple[]>([]);
-  const [loading, setLoading] = useState(true);
+
+  const [isLoading, setIsLoading] = useState(true); // Para la carga inicial de datos
+  const [isSaving, setIsSaving] = useState(false); // Para el proceso de guardar
   const [error, setError] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({}); // Estado para errores de validación del frontend
 
   useEffect(() => {
     const fetchData = async () => {
-      setLoading(true);
+      setIsLoading(true);
       try {
         axios.defaults.baseURL = 'http://127.0.0.1:8000';
 
@@ -79,7 +81,7 @@ export const EmployeeFormPage: React.FC = () => {
           setEmployeeData(data);
         }
       } catch (err) { setError('No se pudieron cargar los datos necesarios para el formulario.'); }
-      finally { setLoading(false); }
+      finally { setIsLoading(false); }
     };
     fetchData();
   }, [id, isEditing, token]);
@@ -196,10 +198,10 @@ export const EmployeeFormPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    setLoading(true);
+    setIsSaving(true);
 
     if (!validateForm()) {
-      setLoading(false);
+      setIsSaving(false);
       // Scroll to the first error
       const firstErrorField = document.querySelector('.border-red-500');
       if (firstErrorField) {
@@ -264,12 +266,34 @@ export const EmployeeFormPage: React.FC = () => {
         };
       });
       navigate('/empleados');
-    } catch (err: any) { setError(`Error al guardar: ${JSON.stringify(err.response?.data)}`); }
-    finally { setLoading(false); }
+      navigate('/empleados');
+    } catch (err: any) {
+      // Improved error handling
+      console.error("Error saving employee:", err);
+      if (err.response && err.response.data) {
+        // If the backend returns a structured error object, try to display it nicely
+        const errorData = err.response.data;
+        let errorMessage = "Error al guardar:";
+
+        if (typeof errorData === 'object') {
+          const messages = Object.entries(errorData).map(([field, msgs]) => {
+            const msgText = Array.isArray(msgs) ? msgs.join(', ') : String(msgs);
+            return `${field}: ${msgText}`;
+          });
+          errorMessage = `Errores de validación: ${messages.join(' | ')}`;
+        } else {
+          errorMessage = `Error al guardar: ${String(errorData)}`;
+        }
+        setError(errorMessage);
+      } else {
+        setError(`Error al guardar: ${err.message || 'Error desconocido'}`);
+      }
+    }
+    finally { setIsSaving(false); }
   };
 
-  if (loading) return <div>Cargando formulario...</div>;
-  if (error) return <div className="text-red-500 bg-red-100 p-4 rounded-lg">{error}</div>;
+  if (isLoading) return <div>Cargando formulario...</div>;
+  // if (error) return ...  <- REMOVED: Do not return early on error, show form instead
 
   const inputStyles = "mt-1 block w-full rounded-md border-gray-300 shadow-md p-2.5 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500";
 
@@ -296,13 +320,31 @@ export const EmployeeFormPage: React.FC = () => {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
-      <div className="flex justify-between items-center mb-8 sticky top-0 bg-gray-200 py-4 z-10 px-6 -mx-6">
+      <div className="flex justify-between items-center mb-8 sticky top-0 bg-gray-200 py-4 z-10 px-6 -mx-6 shadow-sm">
         <h1 className="text-3xl font-bold text-gray-800">{isEditing ? 'Editar Empleado' : 'Crear Nuevo Empleado'}</h1>
         <div>
-          <button type="button" onClick={() => navigate('/empleados')} className="mr-3 px-4 py-2 text-gray-700 bg-gray-300 rounded-md hover:bg-gray-400 font-semibold">Cancelar</button>
-          <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 font-semibold">Guardar Empleado</button>
+          <button type="button" onClick={() => navigate('/empleados')} className="mr-3 px-4 py-2 text-gray-700 bg-gray-300 rounded-md hover:bg-gray-400 font-semibold" disabled={isSaving}>Cancelar</button>
+          <button type="submit" className={`px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 font-semibold ${isSaving ? 'opacity-50 cursor-not-allowed' : ''}`} disabled={isSaving}>
+            {isSaving ? 'Guardando...' : 'Guardar Empleado'}
+          </button>
         </div>
       </div>
+
+      {error && (
+        <div className="fixed top-20 right-6 z-50 animate-bounce">
+          <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded shadow-lg flex items-center" role="alert">
+            <p className="font-bold mr-2">Error:</p>
+            <p>{error}</p>
+            <button
+              type="button"
+              className="ml-4 text-red-700 font-bold hover:text-red-900"
+              onClick={() => setError(null)}
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
 
       {isEditing && (
         <div className="bg-white p-6 rounded-lg shadow-md flex items-center space-x-6">

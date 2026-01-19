@@ -68,8 +68,8 @@ export const LoginPage: React.FC = () => {
         <div className="relative z-10 w-full h-full flex flex-col p-12 lg:p-16 text-white">
           {/* Cabecera Pequeña */}
           <div className="flex-none">
-            <h3 className="text-lg font-extrabold tracking-[0.2em] text-white">ROLON</h3>
             <p className="text-xs font-medium tracking-[0.3em] text-yellow-500 uppercase mt-1">Grupo Empresarial</p>
+            <h3 className="text-lg font-extrabold tracking-[0.2em] text-white">ROLON</h3>
           </div>
 
           {/* Texto Principal */}
@@ -84,7 +84,7 @@ export const LoginPage: React.FC = () => {
                 */}
             <div className="border-l-4 border-yellow-400 pl-6 py-4 bg-white/5 backdrop-blur-sm rounded-r-lg max-w-lg mt-96">
               <p className="text-lg text-gray-100 font-light leading-relaxed">
-                Gestionando el motor de nuestra industria con tecnología de vanguardia y calidez humana.
+                En Cochabamba, corazón productivo de Bolivia, el huevo es un alimento esencial en la mesa de miles de familias.
               </p>
             </div>
           </div>
@@ -92,7 +92,7 @@ export const LoginPage: React.FC = () => {
           {/* Pie de página pequeño - Empujado al fondo */}
           <div className="flex items-center gap-3 opacity-80 mt-auto">
             <div className="w-10 h-0.5 bg-yellow-400"></div>
-            <p className="text-xs font-semibold tracking-widest uppercase">Avícola Rolon • Calidad desde el origen</p>
+            <p className="text-xs font-semibold tracking-widest uppercase">AVICOLA ROLON - PRODUCCION DE HUEVOS</p>
           </div>
         </div>
       </div>

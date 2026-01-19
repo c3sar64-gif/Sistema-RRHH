@@ -52,7 +52,7 @@ interface HoraExtraFormState {
 const initialFormState: HoraExtraFormState = {
     empleado: null,
     fecha_solicitud: new Date().toISOString().split('T')[0],
-    tipo_hora_extra: 'compensacion',
+    tipo_hora_extra: 'horas_extras',
     observacion: '',
     hora_inicio: '',
     hora_fin: '',
@@ -111,7 +111,20 @@ export const HorasExtrasPage: React.FC = () => {
     const [filteredDepartamentos, setFilteredDepartamentos] = useState<DepartamentoFull[]>([]);
     const [filteredEmpleados, setFilteredEmpleados] = useState<EmpleadoFull[]>([]);
 
-    const [view, setView] = useState<View>('month');
+    const [view, setView] = useState<View>(window.innerWidth < 768 ? 'day' : 'month');
+
+    useEffect(() => {
+        const handleResize = () => {
+            if (window.innerWidth < 768) {
+                setView('day');
+            } else {
+                setView(prev => prev === 'day' ? 'month' : prev);
+            }
+        };
+
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
     const [date, setDate] = useState(new Date());
     const [viewEvent, setViewEvent] = useState<HoraExtra | null>(null);
 
@@ -629,8 +642,8 @@ export const HorasExtrasPage: React.FC = () => {
                             <div>
                                 <label>Tipo de Solicitud</label>
                                 <select name="tipo_hora_extra" value={formState.tipo_hora_extra} onChange={handleInputChange} className={inputStyles}>
-                                    <option value="compensacion">Compensación de Hrs Extra</option>
                                     <option value="horas_extras">Horas Extras</option>
+                                    <option value="compensacion">Compensación de Hrs Extra</option>
                                 </select>
                             </div>
                         </div>

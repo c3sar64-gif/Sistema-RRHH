@@ -96,6 +96,11 @@ export const PermisosPage: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
+    const isAdminOrHR = user?.is_superuser || user?.groups.some(g => ['Admin', 'RRHH', 'Encargado', 'Jefe de Departamento'].includes(g.name));
+    const isJefeDepto = user?.groups.some(g => g.name === 'Jefe de Departamento');
+    const isPorteria = user?.groups.some(g => g.name === 'Porteria');
+    const canViewAll = isAdminOrHR || isPorteria;
+
     const [permisos, setPermisos] = useState<Permiso[]>([]);
     const [calendarEvents, setCalendarEvents] = useState<any[]>([]);
 
@@ -106,20 +111,37 @@ export const PermisosPage: React.FC = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [formState, setFormState] = useState<PermisoFormState>(initialFormState);
     const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+    const [isSaving, setIsSaving] = useState(false);
 
     const [selectedJefe, setSelectedJefe] = useState<number | null>(null);
     const [selectedDepartamento, setSelectedDepartamento] = useState<number | null>(null);
     const [filteredDepartamentos, setFilteredDepartamentos] = useState<DepartamentoFull[]>([]);
     const [filteredEmpleados, setFilteredEmpleados] = useState<EmpleadoFull[]>([]);
 
-    const [view, setView] = useState<View>('month');
+    const [view, setView] = useState<View>((isPorteria || window.innerWidth < 768) ? 'day' : 'month');
+
+    useEffect(() => {
+        const handleResize = () => {
+            if (window.innerWidth < 768) {
+                setView('day');
+            } else if (!isPorteria) {
+                setView(prev => prev === 'day' ? 'month' : prev);
+            }
+        };
+
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, [isPorteria]);
+
+    // Auto-select Jefe for JefeDepto users
+    useEffect(() => {
+        if (isPorteria) {
+            setView('day');
+        }
+    }, [isPorteria]);
+
     const [date, setDate] = useState(new Date());
     const [viewEvent, setViewEvent] = useState<Permiso | null>(null);
-
-    const isAdminOrHR = user?.is_superuser || user?.groups.some(g => ['Admin', 'RRHH', 'Encargado', 'Jefe de Departamento'].includes(g.name));
-    const isJefeDepto = user?.groups.some(g => g.name === 'Jefe de Departamento');
-    const isPorteria = user?.groups.some(g => g.name === 'Porteria');
-    const canViewAll = isAdminOrHR || isPorteria;
 
     const fetchData = async () => {
         setLoading(true);
@@ -170,14 +192,6 @@ export const PermisosPage: React.FC = () => {
             fetchData();
         }
     }, [token, user]);
-
-    useEffect(() => {
-        if (isPorteria) {
-            setView('day');
-        } else {
-            setView('month');
-        }
-    }, [isPorteria]);
 
     // Auto-select Jefe for JefeDepto users
     useEffect(() => {
@@ -239,6 +253,7 @@ export const PermisosPage: React.FC = () => {
         }
 
         try {
+            setIsSaving(true);
             await axios.post('http://127.0.0.1:8000/api/permisos/', dataToSubmit, { headers: { 'Authorization': `Token ${token}` } });
             alert('Permiso creado con éxito!');
             setIsModalOpen(false);
@@ -248,6 +263,8 @@ export const PermisosPage: React.FC = () => {
             fetchData();
         } catch (err: any) {
             setFormErrors({ general: `Error al crear el permiso: ${JSON.stringify(err.response?.data)}` });
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -635,8 +652,10 @@ export const PermisosPage: React.FC = () => {
                         </div>
 
                         <div className="flex justify-end mt-6">
-                            <button type="button" onClick={() => setIsModalOpen(false)} className="mr-3 px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 font-semibold">Cancelar</button>
-                            <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 font-semibold">Registrar Permiso</button>
+                            <button type="button" onClick={() => setIsModalOpen(false)} className="mr-3 px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 font-semibold" disabled={isSaving}>Cancelar</button>
+                            <button type="submit" className={`px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 font-semibold ${isSaving ? 'opacity-50 cursor-not-allowed' : ''}`} disabled={isSaving}>
+                                {isSaving ? 'Guardando...' : 'Registrar Permiso'}
+                            </button>
                         </div>
                     </form>
                 </div>

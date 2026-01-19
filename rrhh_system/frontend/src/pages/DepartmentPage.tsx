@@ -184,7 +184,9 @@ export const DepartmentPage: React.FC = () => {
       </div>
 
       <div className="bg-white p-6 rounded-lg shadow-md">
-        <div className="overflow-x-auto">
+
+        {/* Vista Escritorio (Tabla) */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
@@ -207,6 +209,27 @@ export const DepartmentPage: React.FC = () => {
             </tbody>
           </table>
         </div>
+
+        {/* Vista Móvil (Tarjetas) */}
+        <div className="md:hidden grid grid-cols-1 gap-4">
+          {departments.map((dept) => (
+            <div key={dept.id} className="bg-gray-50 p-4 rounded-lg border border-gray-200 shadow-sm flex flex-col gap-2">
+              <div className="flex justify-between items-start">
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">{dept.nombre}</h3>
+                  <p className="text-sm text-gray-600 mt-1">
+                    <span className="font-semibold">Jefe:</span> {dept.jefe_departamento_info ? `${dept.jefe_departamento_info.nombres} ${dept.jefe_departamento_info.apellido_paterno}` : 'N/A'}
+                  </p>
+                </div>
+              </div>
+              <div className="flex justify-end gap-3 mt-2 border-t border-gray-200 pt-2">
+                <button onClick={() => openModal(dept)} className="text-indigo-600 font-medium text-sm">Editar</button>
+                <button onClick={() => handleDelete(dept.id)} className="text-red-600 font-medium text-sm">Eliminar</button>
+              </div>
+            </div>
+          ))}
+        </div>
+
         <div className="mt-4 flex justify-between items-center">
           <button
             onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
