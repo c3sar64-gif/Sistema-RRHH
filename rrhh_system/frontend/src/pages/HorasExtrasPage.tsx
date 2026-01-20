@@ -11,7 +11,8 @@ import 'react-big-calendar/lib/css/react-big-calendar.css';
 import { SearchableSelect } from '../components/SearchableSelect';
 import './CalendarOverrides.css';
 
-import 'moment/dist/locale/es'; // Import Spanish locale
+// @ts-ignore
+import 'moment/locale/es'; // Import Spanish locale
 
 // Set moment locale to Spanish globally
 moment.locale('es');
@@ -95,7 +96,7 @@ export const HorasExtrasPage: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    const [horasExtras, setHorasExtras] = useState<HoraExtra[]>([]);
+    const [_horasExtras, setHorasExtras] = useState<HoraExtra[]>([]);
     const [calendarEvents, setCalendarEvents] = useState<any[]>([]);
 
     const [allDepartments, setAllDepartments] = useState<DepartamentoFull[]>([]);
@@ -134,7 +135,7 @@ export const HorasExtrasPage: React.FC = () => {
     // Based on user request: "ciertos jefes de departamentos tem acceso". Logic below handles Jefes.
 
     // Determine if user can view all resources to dropdowns (Admin/RRHH)
-    const canViewAll = isAdminOrHR;
+    // const canViewAll = isAdminOrHR;
 
     const fetchData = async () => {
         setLoading(true);

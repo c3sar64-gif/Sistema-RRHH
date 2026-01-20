@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, momentLocalizer } from 'react-big-calendar';
 import moment from 'moment';
+// @ts-ignore
 import 'moment/locale/es';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import axios from 'axios';
@@ -40,7 +41,7 @@ const VacacionesPage: React.FC = () => {
     const { token, user } = useAuth();
     const navigate = useNavigate();
     const [events, setEvents] = useState<any[]>([]);
-    const [solicitudes, setSolicitudes] = useState<SolicitudVacacion[]>([]);
+    const [_solicitudes, setSolicitudes] = useState<SolicitudVacacion[]>([]);
 
     const [showModal, setShowModal] = useState(false);
     const [showListModal, setShowListModal] = useState(false);
@@ -52,9 +53,9 @@ const VacacionesPage: React.FC = () => {
     const [esMedioDia, setEsMedioDia] = useState(false);
     const [observacion, setObservacion] = useState('');
     const [fechaIngresoVigente, setFechaIngresoVigente] = useState<string | null>(null);
-    const [vacacionGuardada, setVacacionGuardada] = useState<number | null>(null);
+    const [_vacacionGuardada, setVacacionGuardada] = useState<number | null>(null);
     const [antiguedadDetalle, setAntiguedadDetalle] = useState<string | null>(null);
-    const [vacacionPorLey, setVacacionPorLey] = useState<number | null>(null);
+    const [_vacacionPorLey, setVacacionPorLey] = useState<number | null>(null);
     const [saldoActual, setSaldoActual] = useState<number | null>(null);
     const [saldoGuardadas, setSaldoGuardadas] = useState<number>(0);
     const [saldoLey, setSaldoLey] = useState<number>(0);

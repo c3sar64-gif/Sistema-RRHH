@@ -1,5 +1,6 @@
 // src/AuthContext.tsx
-import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
+import React, { createContext, useState, useContext, useEffect } from 'react';
+import type { ReactNode } from 'react';
 import axios from 'axios';
 import { API_URL } from './config';
 

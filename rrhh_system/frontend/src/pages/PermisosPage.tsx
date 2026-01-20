@@ -12,7 +12,8 @@ import { SearchableSelect } from '../components/SearchableSelect';
 import './CalendarOverrides.css';
 import { API_URL } from '../config';
 
-import 'moment/dist/locale/es'; // Import Spanish locale
+// @ts-ignore
+import 'moment/locale/es'; // Import Spanish locale
 
 // Set moment locale to Spanish globally
 moment.locale('es');
@@ -21,7 +22,7 @@ moment.locale('es');
 const localizer = momentLocalizer(moment);
 
 // --- Interfaces ---
-interface Option { id: number; nombre: string; }
+// interface Option { id: number; nombre: string; }
 interface EmpleadoFull { id: number; nombres: string; apellido_paterno: string; apellido_materno?: string; departamento?: number; }
 interface DepartamentoFull { id: number; nombre: string; jefe_departamento?: number; }
 interface Permiso {
@@ -102,7 +103,7 @@ export const PermisosPage: React.FC = () => {
     const isPorteria = user?.groups.some(g => g.name === 'Porteria');
     const canViewAll = isAdminOrHR || isPorteria;
 
-    const [permisos, setPermisos] = useState<Permiso[]>([]);
+    const [_permisos, setPermisos] = useState<Permiso[]>([]);
     const [calendarEvents, setCalendarEvents] = useState<any[]>([]);
 
     const [allDepartments, setAllDepartments] = useState<DepartamentoFull[]>([]);

@@ -471,7 +471,7 @@ export const EmployeeFormPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {employeeData.familiares.filter(f => f.parentesco === 'hijo/a').map((h, i) => {
+                  {employeeData.familiares.filter(f => f.parentesco === 'hijo/a').map((h, _i) => {
                     const originalIndex = employeeData.familiares.indexOf(h);
                     return (
                       <tr key={originalIndex}>
@@ -520,7 +520,7 @@ export const EmployeeFormPage: React.FC = () => {
             </tr>
           </thead>
           <tbody>
-            {employeeData.familiares.filter(f => f.parentesco !== 'hijo/a').map((c, i) => {
+            {employeeData.familiares.filter(f => f.parentesco !== 'hijo/a').map((c, _i) => {
               const originalIndex = employeeData.familiares.indexOf(c);
               return (
                 <tr key={originalIndex}>
