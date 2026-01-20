@@ -4,6 +4,7 @@ import axios from 'axios';
 import { useAuth } from '../AuthContext';
 import { Modal } from '../components/Modal';
 import { SearchableSelect } from '../components/SearchableSelect';
+import { API_URL } from '../config';
 
 interface Department {
   id: number;
@@ -43,7 +44,7 @@ export const DepartmentPage: React.FC = () => {
   useEffect(() => {
     const fetchAllDepartments = async () => {
       try {
-        const response = await axios.get('http://127.0.0.1:8000/api/departamentos/?no_pagination=true', {
+        const response = await axios.get(`${API_URL}/api/departamentos/?no_pagination=true`, {
           headers: { 'Authorization': `Token ${token}` }
         });
         if (response.data && Array.isArray(response.data)) {
@@ -74,10 +75,10 @@ export const DepartmentPage: React.FC = () => {
     try {
       setLoading(true);
       const [deptosRes, empleadosRes] = await Promise.all([
-        axios.get(`http://127.0.0.1:8000/api/departamentos/?page=${page}&search=${search}`, {
+        axios.get(`${API_URL}/api/departamentos/?page=${page}&search=${search}`, {
           headers: { 'Authorization': `Token ${token}` },
         }),
-        axios.get('http://127.0.0.1:8000/api/empleados/?no_pagination=true', { // Fetch all employees for the dropdown
+        axios.get(`${API_URL}/api/empleados/?no_pagination=true`, { // Fetch all employees for the dropdown
           headers: { 'Authorization': `Token ${token}` },
         }),
       ]);
@@ -127,8 +128,8 @@ export const DepartmentPage: React.FC = () => {
 
   const handleSubmit = async () => {
     const url = editingDepartment
-      ? `http://127.0.0.1:8000/api/departamentos/${editingDepartment.id}/`
-      : 'http://127.0.0.1:8000/api/departamentos/';
+      ? `${API_URL}/api/departamentos/${editingDepartment.id}/`
+      : `${API_URL}/api/departamentos/`;
 
     const method = editingDepartment ? 'put' : 'post';
     const data = {
@@ -153,7 +154,7 @@ export const DepartmentPage: React.FC = () => {
   const handleDelete = async (id: number) => {
     if (window.confirm('¿Estás seguro de que quieres eliminar este departamento?')) {
       try {
-        await axios.delete(`http://127.0.0.1:8000/api/departamentos/${id}/`, {
+        await axios.delete(`${API_URL}/api/departamentos/${id}/`, {
           headers: { 'Authorization': `Token ${token}` }
         });
         fetchDepartments(currentPage, debouncedSearchTerm); // Refresh list

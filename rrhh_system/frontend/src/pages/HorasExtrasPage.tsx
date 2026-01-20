@@ -11,6 +11,8 @@ import 'react-big-calendar/lib/css/react-big-calendar.css';
 import { SearchableSelect } from '../components/SearchableSelect';
 import './CalendarOverrides.css';
 
+import { API_URL } from '../config';
+
 // @ts-ignore
 import 'moment/locale/es'; // Import Spanish locale
 
@@ -141,7 +143,7 @@ export const HorasExtrasPage: React.FC = () => {
         setLoading(true);
         try {
             // Fetch Horas Extras
-            const res = await axios.get('http://127.0.0.1:8000/api/horas-extras/?no_pagination=true', { headers: { 'Authorization': `Token ${token}` } });
+            const res = await axios.get(`${API_URL}/api/horas-extras/?no_pagination=true`, { headers: { 'Authorization': `Token ${token}` } });
 
             const fetchedData = res.data.results || res.data;
             setHorasExtras(fetchedData);
@@ -170,9 +172,9 @@ export const HorasExtrasPage: React.FC = () => {
             // Let's assume Jefes have permission to list employees.
 
             const [departmentsRes, jefesRes, employeesRes] = await Promise.all([
-                axios.get('http://127.0.0.1:8000/api/departamentos/?no_pagination=true', { headers: { 'Authorization': `Token ${token}` } }),
-                axios.get('http://127.0.0.1:8000/api/jefes-departamento/', { headers: { 'Authorization': `Token ${token}` } }),
-                axios.get('http://127.0.0.1:8000/api/empleados/?no_pagination=true', { headers: { 'Authorization': `Token ${token}` } }),
+                axios.get(`${API_URL}/api/departamentos/?no_pagination=true`, { headers: { 'Authorization': `Token ${token}` } }),
+                axios.get(`${API_URL}/api/jefes-departamento/`, { headers: { 'Authorization': `Token ${token}` } }),
+                axios.get(`${API_URL}/api/empleados/?no_pagination=true`, { headers: { 'Authorization': `Token ${token}` } }),
             ]);
             setAllDepartments(departmentsRes.data);
             setAllJefes(jefesRes.data);
@@ -261,7 +263,7 @@ export const HorasExtrasPage: React.FC = () => {
         }
 
         try {
-            await axios.post('http://127.0.0.1:8000/api/horas-extras/', dataToSubmit, { headers: { 'Authorization': `Token ${token}` } });
+            await axios.post(`${API_URL}/api/horas-extras/`, dataToSubmit, { headers: { 'Authorization': `Token ${token}` } });
             alert('Hora Extra registrada con éxito!');
             setIsModalOpen(false);
             setFormState(initialFormState);
@@ -275,7 +277,7 @@ export const HorasExtrasPage: React.FC = () => {
 
     const handleUpdateStatus = async (id: number, newStatus: string) => {
         try {
-            await axios.patch(`http://127.0.0.1:8000/api/horas-extras/${id}/`, { estado: newStatus }, { headers: { 'Authorization': `Token ${token}` } });
+            await axios.patch(`${API_URL}/api/horas-extras/${id}/`, { estado: newStatus }, { headers: { 'Authorization': `Token ${token}` } });
             setHorasExtras(prev => prev.map(p => p.id === id ? { ...p, estado: newStatus } : p));
             setCalendarEvents(prev => prev.map(e => e.id === id ? { ...e, resource: { ...e.resource, estado: newStatus } } : e));
 

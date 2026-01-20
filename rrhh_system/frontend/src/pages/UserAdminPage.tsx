@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../AuthContext';
 import { Modal } from '../components/Modal';
+import { API_URL } from '../config';
 
 interface ApiUser {
   id: number;
@@ -42,8 +43,8 @@ export const UserAdminPage: React.FC = () => {
     try {
       setLoading(true);
       const [usersResponse, employeesResponse] = await Promise.all([
-        axios.get('http://127.0.0.1:8000/api/users/', { headers: { 'Authorization': `Token ${token}` } }),
-        axios.get('http://127.0.0.1:8000/api/empleados/?no_pagination=true', { headers: { 'Authorization': `Token ${token}` } })
+        axios.get(`${API_URL}/api/users/`, { headers: { 'Authorization': `Token ${token}` } }),
+        axios.get(`${API_URL}/api/empleados/?no_pagination=true`, { headers: { 'Authorization': `Token ${token}` } })
       ]);
 
       if (usersResponse.data && Array.isArray(usersResponse.data.results)) {
@@ -67,7 +68,7 @@ export const UserAdminPage: React.FC = () => {
   const handleDelete = async (userId: number) => {
     if (window.confirm('¿Estás seguro de que quieres eliminar este usuario?')) {
       try {
-        await axios.delete(`http://127.0.0.1:8000/api/users/${userId}/`, {
+        await axios.delete(`${API_URL}/api/users/${userId}/`, {
           headers: { 'Authorization': `Token ${token}` }
         });
         setUsers(users.filter(user => user.id !== userId));
@@ -96,7 +97,7 @@ export const UserAdminPage: React.FC = () => {
         payload.empleado_id = "";
       }
 
-      const response = await axios.patch(`http://127.0.0.1:8000/api/users/${editingUser.id}/`, payload, {
+      const response = await axios.patch(`${API_URL}/api/users/${editingUser.id}/`, payload, {
         headers: { 'Authorization': `Token ${token}` }
       });
       setUsers(users.map(user => user.id === editingUser.id ? response.data : user));
@@ -108,7 +109,7 @@ export const UserAdminPage: React.FC = () => {
 
   const handleCreateUser = async () => {
     try {
-      await axios.post('http://127.0.0.1:8000/api/register/', newUser, {
+      await axios.post(`${API_URL}/api/register/`, newUser, {
         headers: { 'Authorization': `Token ${token}` }
       });
       setIsCreateModalOpen(false);

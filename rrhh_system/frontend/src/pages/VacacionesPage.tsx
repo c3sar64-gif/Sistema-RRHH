@@ -9,6 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import { SearchableSelect } from '../components/SearchableSelect';
 
+import { API_URL } from '../config';
 interface SelectOption {
     id: number;
     nombre: string;
@@ -123,7 +124,7 @@ const VacacionesPage: React.FC = () => {
         // If Global Mode (no specific employee selected)
         if (searchEmployeeGlobal) {
             setLoadingHistorial(true);
-            axios.get(`http://127.0.0.1:8000/api/vacaciones-solicitudes/saldo/?empleado_id=${searchEmployeeGlobal.id}`, {
+            axios.get(`${API_URL}/api/vacaciones-solicitudes/saldo/?empleado_id=${searchEmployeeGlobal.id}`, {
                 headers: { Authorization: `Token ${token}` }
             }).then(res => {
                 const hist = (res.data.historial || []).map((h: any) => ({
@@ -173,7 +174,7 @@ const VacacionesPage: React.FC = () => {
 
     const fetchSaldo = async (empId: number) => {
         try {
-            const res = await axios.get(`http://127.0.0.1:8000/api/vacaciones-solicitudes/saldo/?empleado_id=${empId}`, {
+            const res = await axios.get(`${API_URL}/api/vacaciones-solicitudes/saldo/?empleado_id=${empId}`, {
                 headers: { Authorization: `Token ${token}` }
             });
             setSaldoActual(res.data.saldo);
@@ -204,7 +205,7 @@ const VacacionesPage: React.FC = () => {
 
     const fetchEmpleados = async () => {
         try {
-            const res = await axios.get('http://127.0.0.1:8000/api/empleados/?no_pagination=true', {
+            const res = await axios.get(`${API_URL}/api/empleados/?no_pagination=true`, {
                 headers: { Authorization: `Token ${token}` }
             });
             const options = res.data.map((emp: any) => ({
@@ -239,7 +240,7 @@ const VacacionesPage: React.FC = () => {
 
     const fetchData = async () => {
         try {
-            const resSolicitudes = await axios.get('http://127.0.0.1:8000/api/vacaciones-solicitudes/?no_pagination=true', {
+            const resSolicitudes = await axios.get(`${API_URL}/api/vacaciones-solicitudes/?no_pagination=true`, {
                 headers: { Authorization: `Token ${token}` }
             });
             setSolicitudes(resSolicitudes.data);
@@ -262,7 +263,7 @@ const VacacionesPage: React.FC = () => {
         if (!empId) { alert("Debe seleccionar un empleado."); return; }
 
         try {
-            await axios.post('http://127.0.0.1:8000/api/vacaciones-solicitudes/', {
+            await axios.post(`${API_URL}/api/vacaciones-solicitudes/`, {
                 empleado: empId,
                 fecha_inicio: fechaInicio,
                 fecha_fin: fechaFin,
@@ -286,7 +287,7 @@ const VacacionesPage: React.FC = () => {
         if (!window.confirm("¿Confirmar liquidación? Se creará un nuevo ciclo y se registrarán los pagos/traspasos.")) return;
 
         try {
-            await axios.post('http://127.0.0.1:8000/api/vacaciones-solicitudes/liquidar/', {
+            await axios.post(`${API_URL}/api/vacaciones-solicitudes/liquidar/`, {
                 empleado_id: empId,
                 nueva_fecha: nuevaFecha,
                 dias_pagar: diasPagar,
@@ -304,7 +305,7 @@ const VacacionesPage: React.FC = () => {
     const handleAction = async (id: number, action: string) => {
         if (!window.confirm(`¿Está seguro de ${action} esta solicitud?`)) return;
         try {
-            await axios.post(`http://127.0.0.1:8000/api/vacaciones-solicitudes/${id}/${action}/`, {}, {
+            await axios.post(`${API_URL}/api/vacaciones-solicitudes/${id}/${action}/`, {}, {
                 headers: { Authorization: `Token ${token}` }
             });
             fetchData();

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../AuthContext';
 import * as XLSX from 'xlsx';
+import { API_URL } from '../config';
 
 const ReportsPage: React.FC = () => {
     const { token } = useAuth();
@@ -24,12 +25,12 @@ const ReportsPage: React.FC = () => {
         setLoading(true);
         try {
             if (activeTab === 'permisos') {
-                const response = await axios.get('http://127.0.0.1:8000/api/permisos/?no_pagination=true', {
+                const response = await axios.get(`${API_URL}/api/permisos/?no_pagination=true`, {
                     headers: { 'Authorization': `Token ${token}` }
                 });
                 setPermisos(response.data);
             } else {
-                const response = await axios.get('http://127.0.0.1:8000/api/vacaciones-solicitudes/?no_pagination=true', {
+                const response = await axios.get(`${API_URL}/api/vacaciones-solicitudes/?no_pagination=true`, {
                     headers: { 'Authorization': `Token ${token}` }
                 });
                 setVacaciones(response.data);

@@ -6,6 +6,7 @@ import 'moment/locale/es';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import axios from 'axios';
 import { useAuth } from '../AuthContext';
+import { API_URL } from '../config';
 
 moment.locale('es');
 const localizer = momentLocalizer(moment);
@@ -26,7 +27,7 @@ const CumpleanosPage: React.FC = () => {
     useEffect(() => {
         const fetchEmployees = async () => {
             try {
-                const response = await axios.get('http://127.0.0.1:8000/api/empleados/?no_pagination=true', {
+                const response = await axios.get(`${API_URL}/api/empleados/?no_pagination=true`, {
                     headers: { 'Authorization': `Token ${token}` }
                 });
 

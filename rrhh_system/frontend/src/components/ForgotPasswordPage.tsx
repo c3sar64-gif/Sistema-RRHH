@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
+import { API_URL } from '../config';
 
 export const ForgotPasswordPage: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -14,7 +15,7 @@ export const ForgotPasswordPage: React.FC = () => {
     setError(null);
 
     try {
-      await axios.post('http://127.0.0.1:8000/api/password_reset/', { email });
+      await axios.post(`${API_URL}/api/password_reset/`, { email });
       setSuccess(`Si una cuenta con el correo ${email} existe, se ha enviado un enlace para recuperar la contraseña.`);
     } catch (err: any) {
       // Security best practice: Don't reveal if email exists or not, but for now we might want to debug

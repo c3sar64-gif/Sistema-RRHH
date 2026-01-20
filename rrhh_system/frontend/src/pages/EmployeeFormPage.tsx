@@ -4,6 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../AuthContext';
 import { SearchableSelect } from '../components/SearchableSelect';
+import { API_URL } from '../config';
 
 // --- Interfaces ---
 interface Option { id: number; nombre: string; }
@@ -59,20 +60,20 @@ export const EmployeeFormPage: React.FC = () => {
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        axios.defaults.baseURL = 'http://127.0.0.1:8000';
+        // axios.defaults.baseURL = 'http://127.0.0.1:8000'; // Removed
 
-        const cargosRes = await axios.get('/api/cargos/?no_pagination=true', { headers: { 'Authorization': `Token ${token}` } });
+        const cargosRes = await axios.get(`${API_URL}/api/cargos/?no_pagination=true`, { headers: { 'Authorization': `Token ${token}` } });
         setCargos(cargosRes.data);
 
-        const deptosRes = await axios.get('/api/departamentos/?no_pagination=true', { headers: { 'Authorization': `Token ${token}` } });
+        const deptosRes = await axios.get(`${API_URL}/api/departamentos/?no_pagination=true`, { headers: { 'Authorization': `Token ${token}` } });
         setDepartamentos(deptosRes.data);
 
-        const jefesRes = await axios.get('/api/jefes-departamento/', { headers: { 'Authorization': `Token ${token}` } });
+        const jefesRes = await axios.get(`${API_URL}/api/jefes-departamento/`, { headers: { 'Authorization': `Token ${token}` } });
         const jefesData = jefesRes.data.map((e: EmpleadoSimple) => ({ ...e, nombre: `${e.nombres} ${e.apellido_paterno} ${e.apellido_materno || ''}`.trim() }));
         setJefes(jefesData);
 
         if (isEditing) {
-          const empRes = await axios.get(`/api/empleados/${id}/`, { headers: { 'Authorization': `Token ${token}` } });
+          const empRes = await axios.get(`${API_URL}/api/empleados/${id}/`, { headers: { 'Authorization': `Token ${token}` } });
           const data = empRes.data;
           for (const key in data) { if (data[key] === null) { data[key] = ''; } }
           data.familiares = data.familiares || [];
@@ -234,7 +235,7 @@ export const EmployeeFormPage: React.FC = () => {
     formData.append('estudios_json', JSON.stringify(employeeData.estudios));
     formData.append('contratos_json', JSON.stringify(employeeData.contratos));
 
-    const url = isEditing ? `/api/empleados/${id}/` : '/api/empleados/';
+    const url = isEditing ? `${API_URL}/api/empleados/${id}/` : `${API_URL}/api/empleados/`;
     const method = isEditing ? 'patch' : 'post';
 
     try {
@@ -351,7 +352,7 @@ export const EmployeeFormPage: React.FC = () => {
           {employeeData.foto ? (<img
             src={employeeData.foto.startsWith('http://') || employeeData.foto.startsWith('https://')
               ? employeeData.foto
-              : `http://127.0.0.1:8000${employeeData.foto}`}
+              : `${API_URL}${employeeData.foto}`}
             alt="Foto de perfil"
             className="h-32 w-32 rounded-full object-cover border-4 border-gray-200"
           />) : (<div className="h-32 w-32 rounded-full bg-gray-200 flex items-center justify-center text-gray-400">Sin Foto</div>)}
@@ -848,7 +849,7 @@ export const EmployeeFormPage: React.FC = () => {
                 if (fileUrl) {
                   const fullUrl = fileUrl.startsWith('http://') || fileUrl.startsWith('https://')
                     ? fileUrl
-                    : `http://127.0.0.1:8000${fileUrl}`;
+                    : `${API_URL}${fileUrl}`;
                   return (
                     <a key={key} href={fullUrl} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:text-indigo-800 hover:underline p-3 bg-gray-50 rounded-md truncate">
                       Ver {label}

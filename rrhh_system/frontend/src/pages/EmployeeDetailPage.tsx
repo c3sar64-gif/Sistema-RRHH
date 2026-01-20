@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../AuthContext';
+import { API_URL } from '../config';
 
 // Usamos la misma interfaz que el formulario para consistencia
 interface EmployeeData {
@@ -65,11 +66,11 @@ export const EmployeeDetailPage: React.FC = () => {
     const fetchEmployeeData = async () => {
       setLoading(true);
       try {
-        axios.defaults.baseURL = 'http://127.0.0.1:8000';
+        // axios.defaults.baseURL = 'http://127.0.0.1:8000'; // Removed
         const [empRes, vacRes, permRes] = await Promise.all([
-          axios.get(`/api/empleados/${id}/`, { headers: { 'Authorization': `Token ${token}` } }),
-          axios.get(`/api/vacaciones-solicitudes/?empleado=${id}&no_pagination=true`, { headers: { 'Authorization': `Token ${token}` } }),
-          axios.get(`/api/permisos/?empleado=${id}&no_pagination=true`, { headers: { 'Authorization': `Token ${token}` } })
+          axios.get(`${API_URL}/api/empleados/${id}/`, { headers: { 'Authorization': `Token ${token}` } }),
+          axios.get(`${API_URL}/api/vacaciones-solicitudes/?empleado=${id}&no_pagination=true`, { headers: { 'Authorization': `Token ${token}` } }),
+          axios.get(`${API_URL}/api/permisos/?empleado=${id}&no_pagination=true`, { headers: { 'Authorization': `Token ${token}` } })
         ]);
 
         setEmployee(empRes.data);
@@ -129,7 +130,7 @@ export const EmployeeDetailPage: React.FC = () => {
           <div className="flex mb-4 gap-6 break-inside-avoid">
             <div className="flex-shrink-0">
               <img
-                src={employee.foto ? (employee.foto.startsWith('http') ? employee.foto : `http://127.0.0.1:8000${employee.foto}`) : '/vite.svg'}
+                src={employee.foto ? (employee.foto.startsWith('http') ? employee.foto : `${API_URL}${employee.foto}`) : '/vite.svg'}
                 alt="Foto"
                 className="h-28 w-24 object-cover border border-gray-800 rounded-sm shadow-sm bg-gray-100"
               />
@@ -320,7 +321,7 @@ export const EmployeeDetailPage: React.FC = () => {
         <div className="bg-white p-6 rounded-lg shadow-md flex items-center space-x-6">
           <img
             src={employee.foto
-              ? (employee.foto.startsWith('http') ? employee.foto : `http://127.0.0.1:8000${employee.foto}`)
+              ? (employee.foto.startsWith('http') ? employee.foto : `${API_URL}${employee.foto}`)
               : '/vite.svg'
             }
             alt="Foto"
@@ -369,7 +370,7 @@ export const EmployeeDetailPage: React.FC = () => {
                 {documentFields.map(({ key, label }) => {
                   const fileUrl = (employee as any)[key];
                   if (fileUrl) {
-                    const fullUrl = fileUrl.startsWith('http') ? fileUrl : `http://127.0.0.1:8000${fileUrl}`;
+                    const fullUrl = fileUrl.startsWith('http') ? fileUrl : `${API_URL}${fileUrl}`;
                     return (
                       <a key={key} href={fullUrl} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:text-indigo-800 hover:underline p-3 bg-gray-50 rounded-md truncate">
                         Ver {label}

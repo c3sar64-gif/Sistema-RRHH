@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../AuthContext';
 import { SearchableSelect } from '../components/SearchableSelect';
+import { API_URL } from '../config';
 
 interface SelectOption {
     id: number;
@@ -39,7 +40,7 @@ const VacacionesGuardadasPage: React.FC = () => {
 
     const fetchEmpleados = async () => {
         try {
-            const response = await axios.get('http://127.0.0.1:8000/api/empleados/?no_pagination=true', {
+            const response = await axios.get(`${API_URL}/api/empleados/?no_pagination=true`, {
                 headers: { Authorization: `Token ${token}` }
             });
             const data = response.data.results || response.data;
@@ -61,7 +62,7 @@ const VacacionesGuardadasPage: React.FC = () => {
             setLoading(true);
 
             // 1. Fetch Employees for dropdown (needed for filtering/manual entry)
-            const resEmp = await axios.get('http://127.0.0.1:8000/api/empleados/?no_pagination=true', {
+            const resEmp = await axios.get(`${API_URL}/api/empleados/?no_pagination=true`, {
                 headers: { Authorization: `Token ${token}` }
             });
             const emps = resEmp.data.results || resEmp.data;
@@ -76,7 +77,7 @@ const VacacionesGuardadasPage: React.FC = () => {
             }
 
             // 2. Fetch Optimized Global Ledger (Single Request)
-            const resLedger = await axios.get('http://127.0.0.1:8000/api/vacaciones-solicitudes/global_ledger/', {
+            const resLedger = await axios.get(`${API_URL}/api/vacaciones-solicitudes/global_ledger/`, {
                 headers: { Authorization: `Token ${token}` }
             });
 
@@ -103,12 +104,12 @@ const VacacionesGuardadasPage: React.FC = () => {
 
         try {
             if (editingId) {
-                await axios.patch(`http://127.0.0.1:8000/api/vacaciones-guardadas/${editingId}/`, payload, {
+                await axios.patch(`${API_URL}/api/vacaciones-guardadas/${editingId}/`, payload, {
                     headers: { Authorization: `Token ${token}` }
                 });
                 alert("Registro actualizado.");
             } else {
-                await axios.post('http://127.0.0.1:8000/api/vacaciones-guardadas/', payload, {
+                await axios.post(`${API_URL}/api/vacaciones-guardadas/`, payload, {
                     headers: { Authorization: `Token ${token}` }
                 });
                 alert("Vacaciones guardadas registradas.");
@@ -124,7 +125,7 @@ const VacacionesGuardadasPage: React.FC = () => {
     const handleDelete = async (id: number) => {
         if (!window.confirm("¿Seguro que desea eliminar este registro manual?")) return;
         try {
-            await axios.delete(`http://127.0.0.1:8000/api/vacaciones-guardadas/${id}/`, {
+            await axios.delete(`${API_URL}/api/vacaciones-guardadas/${id}/`, {
                 headers: { Authorization: `Token ${token}` }
             });
             fetchLedgerData();

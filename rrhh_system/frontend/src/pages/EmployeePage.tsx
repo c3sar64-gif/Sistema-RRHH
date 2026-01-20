@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../AuthContext';
 import { SearchableSelect } from '../components/SearchableSelect'; // Importar SearchableSelect
+import { API_URL } from '../config';
 
 interface Employee {
   id: number;
@@ -39,7 +40,7 @@ export const EmployeePage: React.FC = () => {
   useEffect(() => {
     const fetchAllEmployees = async () => {
       try {
-        const response = await axios.get('http://127.0.0.1:8000/api/empleados/?no_pagination=true', {
+        const response = await axios.get(`${API_URL}/api/empleados/?no_pagination=true`, {
           headers: { 'Authorization': `Token ${token}` }
         });
         if (response.data && Array.isArray(response.data)) {
@@ -73,7 +74,7 @@ export const EmployeePage: React.FC = () => {
   const fetchEmployees = useCallback(async (page: number, search: string) => {
     try {
       setLoading(true);
-      const url = `http://127.0.0.1:8000/api/empleados/?page=${page}&search=${search}`;
+      const url = `${API_URL}/api/empleados/?page=${page}&search=${search}`;
 
       const response = await axios.get(url, {
         headers: { 'Authorization': `Token ${token}` }
@@ -100,7 +101,7 @@ export const EmployeePage: React.FC = () => {
   const handleDelete = async (id: number) => {
     if (window.confirm('¿Estás seguro de que quieres eliminar este empleado?')) {
       try {
-        await axios.delete(`http://127.0.0.1:8000/api/empleados/${id}/`, {
+        await axios.delete(`${API_URL}/api/empleados/${id}/`, {
           headers: { 'Authorization': `Token ${token}` }
         });
         fetchEmployees(currentPage, debouncedSearchTerm); // Refresh list on the current page

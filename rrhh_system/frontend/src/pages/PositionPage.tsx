@@ -4,6 +4,7 @@ import axios from 'axios';
 import { useAuth } from '../AuthContext';
 import { Modal } from '../components/Modal';
 import { SearchableSelect } from '../components/SearchableSelect'; // Importar SearchableSelect
+import { API_URL } from '../config';
 
 interface Position {
   id: number;
@@ -36,7 +37,7 @@ export const PositionPage: React.FC = () => {
   useEffect(() => {
     const fetchAllPositions = async () => {
       try {
-        const response = await axios.get('http://127.0.0.1:8000/api/cargos/?no_pagination=true', {
+        const response = await axios.get(`${API_URL}/api/cargos/?no_pagination=true`, {
           headers: { 'Authorization': `Token ${token}` }
         });
         if (response.data && Array.isArray(response.data)) {
@@ -65,7 +66,7 @@ export const PositionPage: React.FC = () => {
   const fetchPositions = async (page: number, search: string) => {
     try {
       setLoading(true);
-      const response = await axios.get(`http://127.0.0.1:8000/api/cargos/?page=${page}&search=${search}`, {
+      const response = await axios.get(`${API_URL}/api/cargos/?page=${page}&search=${search}`, {
         headers: { 'Authorization': `Token ${token}` }
       });
       if (response.data && Array.isArray(response.data.results)) {
@@ -98,10 +99,10 @@ export const PositionPage: React.FC = () => {
   };
 
   const handleSubmit = async () => {
-    const url = editingPosition 
-      ? `http://127.0.0.1:8000/api/cargos/${editingPosition.id}/`
-      : 'http://127.0.0.1:8000/api/cargos/';
-    
+    const url = editingPosition
+      ? `${API_URL}/api/cargos/${editingPosition.id}/`
+      : `${API_URL}/api/cargos/`;
+
     const method = editingPosition ? 'put' : 'post';
 
     try {
@@ -121,7 +122,7 @@ export const PositionPage: React.FC = () => {
   const handleDelete = async (id: number) => {
     if (window.confirm('¿Estás seguro de que quieres eliminar este cargo?')) {
       try {
-        await axios.delete(`http://127.0.0.1:8000/api/cargos/${id}/`, {
+        await axios.delete(`${API_URL}/api/cargos/${id}/`, {
           headers: { 'Authorization': `Token ${token}` }
         });
         fetchPositions(currentPage, debouncedSearchTerm); // Refresh list
@@ -153,66 +154,66 @@ export const PositionPage: React.FC = () => {
 
       <div className="bg-white p-6 rounded-lg shadow-md">
         <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                    <tr>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre del Cargo</th>
-                        <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
-                    </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                    {positions.map((pos) => (
-                        <tr key={pos.id}>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{pos.nombre}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-right">
-                                <button onClick={() => openModal(pos)} className="text-indigo-600 hover:text-indigo-900 mr-4">Editar</button>
-                                <button onClick={() => handleDelete(pos.id)} className="text-red-600 hover:text-red-900">Eliminar</button>
-                            </td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre del Cargo</th>
+                <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {positions.map((pos) => (
+                <tr key={pos.id}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{pos.nombre}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-right">
+                    <button onClick={() => openModal(pos)} className="text-indigo-600 hover:text-indigo-900 mr-4">Editar</button>
+                    <button onClick={() => handleDelete(pos.id)} className="text-red-600 hover:text-red-900">Eliminar</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
         <div className="mt-4 flex justify-between items-center">
-            <button 
-                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} 
-                disabled={currentPage === 1}
-                className="px-4 py-2 bg-gray-300 text-gray-800 rounded-md disabled:opacity-50 hover:shadow-md"
-            >
-                Anterior
-            </button>
-            <span>
-                Página {currentPage} de {totalPages}
-            </span>
-            <button 
-                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} 
-                disabled={currentPage === totalPages}
-                className="px-4 py-2 bg-gray-300 text-gray-800 rounded-md disabled:opacity-50 hover:shadow-md"
-            >
-                Siguiente
-            </button>
+          <button
+            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+            disabled={currentPage === 1}
+            className="px-4 py-2 bg-gray-300 text-gray-800 rounded-md disabled:opacity-50 hover:shadow-md"
+          >
+            Anterior
+          </button>
+          <span>
+            Página {currentPage} de {totalPages}
+          </span>
+          <button
+            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+            disabled={currentPage === totalPages}
+            className="px-4 py-2 bg-gray-300 text-gray-800 rounded-md disabled:opacity-50 hover:shadow-md"
+          >
+            Siguiente
+          </button>
         </div>
       </div>
 
       <Modal isOpen={isModalOpen} onClose={closeModal}>
         <div>
-            <h2 className="text-2xl font-bold mb-6">{editingPosition ? 'Editar Cargo' : 'Crear Nuevo Cargo'}</h2>
-            {error && <div className="text-red-500 bg-red-100 p-3 rounded-lg mb-4">{error}</div>}
-            <div className="space-y-4">
-                <div>
-                    <label className="block text-sm font-medium text-gray-700">Nombre del Cargo</label>
-                    <input 
-                      type="text" 
-                      value={positionName} 
-                      onChange={(e) => setPositionName(e.target.value)} 
-                      className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2.5" 
-                    />
-                </div>
+          <h2 className="text-2xl font-bold mb-6">{editingPosition ? 'Editar Cargo' : 'Crear Nuevo Cargo'}</h2>
+          {error && <div className="text-red-500 bg-red-100 p-3 rounded-lg mb-4">{error}</div>}
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Nombre del Cargo</label>
+              <input
+                type="text"
+                value={positionName}
+                onChange={(e) => setPositionName(e.target.value)}
+                className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2.5"
+              />
             </div>
-            <div className="flex justify-end mt-8">
-                <button onClick={closeModal} className="mr-3 px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 font-semibold">Cancelar</button>
-                <button onClick={handleSubmit} className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 font-semibold">Guardar</button>
-            </div>
+          </div>
+          <div className="flex justify-end mt-8">
+            <button onClick={closeModal} className="mr-3 px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 font-semibold">Cancelar</button>
+            <button onClick={handleSubmit} className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 font-semibold">Guardar</button>
+          </div>
         </div>
       </Modal>
     </div>
