@@ -74,7 +74,7 @@ export const LoginPage: React.FC = () => {
           </div>
 
           {/* Texto Principal */}
-          <div className="flex flex-col justify-center mt-20">
+          <div className="flex flex-col justify-center mt-10">
             <h1 className="text-5xl lg:text-6xl font-bold leading-tight mb-8">
               Recursos Humanos<br />
               <span className="text-yellow-400 italic">RRHH</span>
